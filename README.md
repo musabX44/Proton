@@ -6,7 +6,7 @@ Proton is a statically typed systems programming language designed to provide lo
 
 It aims to occupy a practical space between the simplicity of higher-level systems languages and the control traditionally associated with C.
 
-> **Proton 11 — LAM-2**
+> **Proton — LAM**
 > **20,000,000 string iterations**
 > **~1.9 MB Peak RSS**
 
@@ -33,7 +33,7 @@ Proton is not intended to replace every existing systems language. It is an expe
 * Static type system
 * Native compilation
 * Explicit memory management
-* LAM-2 lifetime-aware allocation architecture
+* LAM lifetime-aware allocation architecture
 * No tracing garbage collector
 * Low-level programming capabilities
 * C-like systems programming workflow
@@ -61,9 +61,9 @@ A simple Proton program should feel familiar to developers coming from C-like la
 
 **LAM — Lifecycle Allocation Manager**
 
-LAM-2 is Proton's memory-management architecture for handling allocations according to object lifetime and execution context.
+LAM is Proton's memory-management architecture for handling allocations according to object lifetime and execution context.
 
-Instead of treating every temporary allocation as an independent long-lived heap object, LAM-2 can organize allocations around their expected lifetime.
+Instead of treating every temporary allocation as an independent long-lived heap object, can organize allocations around their expected lifetime.
 
 Conceptually:
 
@@ -86,13 +86,13 @@ Region reclaimed
 
 The goal is to reduce unnecessary allocation overhead while keeping memory behavior predictable.
 
-LAM-2 is an active area of development.
+LAM is an active area of development.
 
 ---
 
 # Benchmark
 
-One of the current Proton 11 LAM-2 stress tests performs:
+One of the current Proton 11 LAM stress tests performs:
 
 ```text
 20,000,000 string iterations
@@ -235,7 +235,7 @@ Topics include:
 * Functions
 * Modules
 * Memory management
-* LAM-2
+* LAM
 * Compiler architecture
 * Standard library
 * VM
@@ -270,7 +270,7 @@ Areas where contributions are especially useful:
 * Standard library
 * Runtime
 * VM
-* LAM-2
+* LAM
 * Documentation
 * Testing
 * Benchmarking
@@ -281,25 +281,6 @@ Before contributing, please read:
 ```text
 CONTRIBUTING.md
 ```
-
----
-
-# Roadmap
-
-The Proton roadmap includes:
-
-* [ ] Expanded standard library
-* [ ] More complete tooling
-* [ ] Improved diagnostics
-* [ ] Advanced lifetime analysis
-* [ ] Escape analysis
-* [ ] Improved LAM-2 optimization
-* [ ] Additional target platforms
-* [ ] Package management
-* [ ] Debugger integration
-* [ ] Production-oriented runtime improvements
-
-The roadmap is subject to change as the language evolves.
 
 ---
 
@@ -340,7 +321,7 @@ It aims to make working close to the machine easier.
 
 # Status
 
-**Proton 11 — Experimental / Active Development**
+**Proton — Experimental / Active Development**
 
 Proton is not yet positioned as a drop-in replacement for established systems languages.
 
@@ -381,7 +362,7 @@ If you find a compiler bug, please provide:
 Low-level enough to build with.**
 
 ```text
-PROTON 11
+PROTON
 LAM-2
 20,000,000 string iterations
 ~1.9 MB Peak RSS
