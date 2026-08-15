@@ -1,0 +1,22 @@
+fn square(x: int): int {
+    return x * x;
+}
+
+fn cube(x: int): int {
+    return x * x * x;
+}
+
+fn apply(f: fn, x: int): int {
+    return f(x);
+}
+
+fn main() {
+    io::out("apply(square, 5) = ", apply(square, 5));
+    io::out("apply(cube, 3)   = ", apply(cube, 3));
+
+    var g: fn = square;
+    io::out("g(7) = ", g(7));
+
+    g = cube;
+    io::out("g(4) after reassign = ", g(4));
+}

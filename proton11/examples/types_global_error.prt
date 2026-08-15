@@ -1,0 +1,5 @@
+const MAX_USERS: uint8 = 300;
+
+fn main() {
+    io::out("unreachable");
+}

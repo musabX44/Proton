@@ -1,0 +1,148 @@
+// stdlib/collections.prt -- pure-Proton list/collection utility library.
+//
+// Loaded via `use collections;`. Every top-level name here lives under
+// the `collections::` namespace: collections::map(xs, fn), etc.
+//
+// Proton lists are fixed-size once created via a `[...]` literal, and
+// plain assignment aliases rather than copies. Every "build a new list"
+// helper below starts from `[]` and grows it with the built-in
+// `push(list, value)` (amortized O(1), returns the list). `listCopy`
+// is used wherever a helper needs to mutate a working copy without
+// touching the caller's list (e.g. sort).
+//
+// Type notes: Proton generics require explicit instantiation
+// (`fn<T>(...)`) rather than inference, and list element types only go
+// one level deep (`T[]`, no `T[][]`). To keep every function usable on
+// any element type without forcing callers to instantiate generics at
+// every call site, the collection itself is typed `list[]` throughout
+// this module (an array whose element type is left unchecked) and the
+// per-element callback (`fn`) is a plain first-class function value --
+// see examples/firstclass_fn_test.prt for the calling convention.
+
+// ---------------------------------------------------------------------
+// Transform
+// ---------------------------------------------------------------------
+
+fn map(list: list[], f: fn): list[] {
+    var result: list[] = [];
+    for (var i: int = 0; i < len(list); i++) {
+        push(result, f(list[i]));
+    }
+    return result;
+}
+
+fn filter(list: list[], f: fn): list[] {
+    var result: list[] = [];
+    for (var i: int = 0; i < len(list); i++) {
+        if (f(list[i])) {
+            push(result, list[i]);
+        }
+    }
+    return result;
+}
+
+fn reduce(list: list[], f: fn, initial: list[]): list[] {
+    var acc: list[] = initial;
+    for (var i: int = 0; i < len(list); i++) {
+        acc = f(acc, list[i]);
+    }
+    return acc;
+}
+
+// ---------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------
+
+// Returns the first element for which f(element) is true, or nil if
+// none match.
+fn find(list: list[], f: fn): list[] {
+    for (var i: int = 0; i < len(list); i++) {
+        if (f(list[i])) {
+            return list[i];
+        }
+    }
+    return nil;
+}
+
+fn contains(list: list[], value: list[]): bool {
+    for (var i: int = 0; i < len(list); i++) {
+        if (list[i] == value) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// ---------------------------------------------------------------------
+// Reorder / reshape
+// ---------------------------------------------------------------------
+
+fn reverse(list: list[]): list[] {
+    var result: list[] = [];
+    for (var i: int = len(list) - 1; i >= 0; i--) {
+        push(result, list[i]);
+    }
+    return result;
+}
+
+// Ascending sort via insertion sort (stable, simple, no dependency on
+// bitwise tricks or a comparator callback -- relies on Proton's native
+// `<` on the element type). Works on a copy; the input list is
+// untouched.
+fn sort(list: list[]): list[] {
+    var result: list[] = listCopy(list);
+    for (var i: int = 1; i < len(result); i++) {
+        var key: list[] = result[i];
+        var j: int = i - 1;
+        while (j >= 0 && result[j] > key) {
+            result[j + 1] = result[j];
+            j = j - 1;
+        }
+        result[j + 1] = key;
+    }
+    return result;
+}
+
+fn unique(list: list[]): list[] {
+    var result: list[] = [];
+    for (var i: int = 0; i < len(list); i++) {
+        if (!contains(result, list[i])) {
+            push(result, list[i]);
+        }
+    }
+    return result;
+}
+
+// Flattens one level: [[1,2],[3],[4,5]] -> [1,2,3,4,5].
+fn flatten(list: list[]): list[] {
+    var result: list[] = [];
+    for (var i: int = 0; i < len(list); i++) {
+        var inner: list[] = list[i];
+        for (var j: int = 0; j < len(inner); j++) {
+            push(result, inner[j]);
+        }
+    }
+    return result;
+}
+
+// ---------------------------------------------------------------------
+// Generate
+// ---------------------------------------------------------------------
+
+// [start, end) stepping by `step` (which may be negative to count down).
+fn range(start: int, end: int, step: int): int[] {
+    var result: int[] = [];
+    if (step == 0) {
+        panic("collections::range: step must not be 0");
+    }
+    if (step > 0) {
+        for (var i: int = start; i < end; i = i + step) {
+            push(result, i);
+        }
+    } else {
+        for (var i: int = start; i > end; i = i + step) {
+            push(result, i);
+        }
+    }
+    return result;
+}

@@ -1,0 +1,43 @@
+use ml;
+
+fn main() {
+    var xs: float64[] = [1.0, 2.0, 3.0, 4.0, 5.0];
+    var ys: float64[] = [2.0, 4.0, 6.0, 8.0, 10.0];
+
+    io::out("mean(xs) = ", ml::mean(xs));
+    io::out("stddev(xs) = ", ml::stddev(xs));
+    io::out("correlation = ", ml::correlation(xs, ys));
+
+    var model: LinRegModel = ml::linRegFit(xs, ys);
+    io::out("slope = ", model.slope, " intercept = ", model.intercept);
+    io::out("predict(10) = ", ml::linRegPredict(model, 10.0));
+    io::out("R^2 = ", ml::linRegRSquared(model, xs, ys));
+
+    var a: list[] = [[1.0, 2.0], [3.0, 4.0]];
+    var b: list[] = [[5.0, 6.0], [7.0, 8.0]];
+    var c: list[] = ml::matMul(a, b);
+    var c0: float64[] = c[0];
+    var c1: float64[] = c[1];
+    io::out("matMul[0][0]=", c0[0], " [0][1]=", c0[1], " [1][0]=", c1[0], " [1][1]=", c1[1]);
+
+    var v: float64[] = ml::matVecMul(a, [1.0, 1.0]);
+    io::out("matVecMul = [", v[0], ", ", v[1], "]");
+
+    io::out("sigmoid(0) = ", ml::sigmoid(0.0));
+    io::out("relu(-3) = ", ml::relu(-3.0), " relu(3) = ", ml::relu(3.0));
+    io::out("tanh(0) = ", ml::tanh(0.0));
+
+    var xsMulti: list[] = [[1.0, 1.0], [2.0, 1.0], [3.0, 1.0], [4.0, 1.0]];
+    var ysMulti: float64[] = [3.0, 5.0, 7.0, 9.0];
+    var weights: float64[] = ml::gdFit(xsMulti, ysMulti, 0.01, 2000);
+    io::out("gd weights = [", weights[0], ", ", weights[1], "]");
+    io::out("gd mse = ", ml::mse(weights, xsMulti, ysMulti));
+
+    var points: list[] = [[1.0, 1.0], [1.5, 2.0], [8.0, 8.0], [9.0, 9.0]];
+    var initCentroids: list[] = [[0.0, 0.0], [10.0, 10.0]];
+    var centroids: list[] = ml::kMeansFit(points, initCentroids, 10);
+    var cen0: float64[] = centroids[0];
+    var cen1: float64[] = centroids[1];
+    io::out("centroid0 = [", cen0[0], ", ", cen0[1], "]");
+    io::out("centroid1 = [", cen1[0], ", ", cen1[1], "]");
+}

@@ -1,0 +1,20 @@
+fn max<T>(a: T, b: T): T {
+    if (a > b) {
+        return a;
+    }
+    return b;
+}
+
+fn identity<T>(x: T): T {
+    return x;
+}
+
+fn main() {
+    io::out("max<int>(3,5) = ", max<int>(3, 5));
+    io::out("max<int>(9,2) = ", max<int>(9, 2));
+    io::out("max<float64>(1.5, 2.5) = ", max<float64>(1.5, 2.5));
+    io::out("identity<string>(hi) = ", identity<string>("hi"));
+    var x: int = 10;
+    var y: int = 20;
+    io::out("plain compare still works: ", x < y);
+}

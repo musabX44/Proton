@@ -1,0 +1,22 @@
+use os;
+
+fn main() {
+    io::out("platform = ", os::platform());
+    io::out("arch = ", os::arch());
+    io::out("cpu_count = ", os::cpu_count());
+    io::out("hostname = ", os::hostname());
+    io::out("cwd = ", os::cwd());
+    io::out("home = ", os::home());
+    io::out("env HOME = ", os::env("HOME"));
+    io::out("args = ", os::args());
+
+    io::out("pid = ", os::pid());
+    io::out("parent_pid = ", os::parent_pid());
+
+    os::set_env("PROTON_TEST_VAR", "hello42");
+    io::out("env PROTON_TEST_VAR after set_env = ", os::env("PROTON_TEST_VAR"));
+
+    io::out("about to exit with code 7");
+    os::exit(7);
+    io::out("this should never print");
+}

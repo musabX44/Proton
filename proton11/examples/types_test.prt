@@ -1,0 +1,21 @@
+fn main() {
+    var a: int8 = 120;
+    var b: uint8 = 250;
+    var c: int16 = -30000;
+    var d: int32 = 2000000000;
+    var e: uint = 42;
+    var f: float32 = 3.14;
+    var g: byte = 255;
+    var h: char = 65;
+    var i: bool = true;
+    var s: string = "hello";
+    io::out("a=", a, " b=", b, " c=", c, " d=", d);
+    io::out("e=", e, " f=", f, " g=", g, " h=", h);
+    io::out("i=", i, " s=", s);
+
+    a = 100;
+    io::out("a reassigned = ", a);
+
+    io::out("Now triggering an intentional overflow error:");
+    a = 200; // out of int8 range (-128..127) -> should panic with a clear error
+}

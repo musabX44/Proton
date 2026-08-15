@@ -1,0 +1,12 @@
+fn factorial(n: int): int {
+    if (n <= 1) {
+        return 1;
+    }
+    return n * factorial(n - 1);
+}
+fn main() {
+    io::out("Enter a number:");
+    var number: int = io::in();
+    var result: int = factorial(number);
+    io::out("Factorial = ", result);
+}

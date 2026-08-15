@@ -1,0 +1,529 @@
+// stdlib/ml.prt -- pure-Proton machine learning / statistics library.
+//
+// Loaded via `use ml;`. Every top-level name here lives under the
+// `ml::` namespace: ml::mean(xs), ml::matMul(a, b), ml::linRegFit(...).
+//
+// Depends on `math` (sqrt) -- this module does `use math;` itself, so
+// callers don't need to `use math;` just to call ml functions.
+//
+// Data representation:
+//   - Vector  -> float64[]
+//   - Matrix  -> list[]   (a list of row vectors, each a float64[]; all
+//     rows the same length). Proton's type annotations only support one
+//     level of `T[]` -- there is no `float64[][]` syntax -- so matrices
+//     are declared as `list[]`: an array whose element type is left
+//     unchecked (each element is itself a list, not a primitive), and
+//     every function in this module that returns/accepts a matrix uses
+//     `list[]` for that reason. Individual rows (`m[r]`) are still
+//     ordinary `float64[]` you can index normally: `m[r][c]`.
+//
+// Building lists: Proton lists are fixed-size once created via a `[...]`
+// literal, and plain assignment (`var b: T[] = a;`) aliases the same
+// list rather than copying it. This module relies on two VM built-ins
+// added alongside it for exactly this reason:
+//   - `push(list, value)` -- appends in place, amortized O(1), and
+//     yields the (same, now-longer) list as an expression value.
+//   - `listCopy(list)` -- an independent, separately-mutable copy.
+// Every "build a list of length N" helper below starts from `[]` and
+// grows it with `push` in a loop, rather than trying to pre-size or
+// alias an existing list.
+
+use math;
+
+// ---------------------------------------------------------------------
+// Vector statistics
+// ---------------------------------------------------------------------
+
+fn sum(xs: float64[]): float64 {
+    var total: float64 = 0.0;
+    for (var i: int32 = 0; i < len(xs); i++) {
+        total = total + xs[i];
+    }
+    return total;
+}
+
+fn mean(xs: float64[]): float64 {
+    if (len(xs) == 0) {
+        panic("ml::mean: empty vector");
+    }
+    return sum(xs) / len(xs);
+}
+
+// Population variance (divides by n). Use sampleVariance for the n-1 form.
+fn variance(xs: float64[]): float64 {
+    var m: float64 = mean(xs);
+    var acc: float64 = 0.0;
+    for (var i: int32 = 0; i < len(xs); i++) {
+        var d: float64 = xs[i] - m;
+        acc = acc + d * d;
+    }
+    return acc / len(xs);
+}
+
+fn sampleVariance(xs: float64[]): float64 {
+    if (len(xs) < 2) {
+        panic("ml::sampleVariance: need at least 2 samples");
+    }
+    var m: float64 = mean(xs);
+    var acc: float64 = 0.0;
+    for (var i: int32 = 0; i < len(xs); i++) {
+        var d: float64 = xs[i] - m;
+        acc = acc + d * d;
+    }
+    return acc / (len(xs) - 1);
+}
+
+fn stddev(xs: float64[]): float64 {
+    return math::sqrt(variance(xs));
+}
+
+fn sampleStddev(xs: float64[]): float64 {
+    return math::sqrt(sampleVariance(xs));
+}
+
+fn vecMin(xs: float64[]): float64 {
+    if (len(xs) == 0) {
+        panic("ml::vecMin: empty vector");
+    }
+    var best: float64 = xs[0];
+    for (var i: int32 = 1; i < len(xs); i++) {
+        if (xs[i] < best) {
+            best = xs[i];
+        }
+    }
+    return best;
+}
+
+fn vecMax(xs: float64[]): float64 {
+    if (len(xs) == 0) {
+        panic("ml::vecMax: empty vector");
+    }
+    var best: float64 = xs[0];
+    for (var i: int32 = 1; i < len(xs); i++) {
+        if (xs[i] > best) {
+            best = xs[i];
+        }
+    }
+    return best;
+}
+
+// Pearson correlation coefficient between two equal-length vectors.
+fn correlation(xs: float64[], ys: float64[]): float64 {
+    if (len(xs) != len(ys)) {
+        panic("ml::correlation: vectors must be the same length");
+    }
+    var mx: float64 = mean(xs);
+    var my: float64 = mean(ys);
+    var num: float64 = 0.0;
+    var dx2: float64 = 0.0;
+    var dy2: float64 = 0.0;
+    for (var i: int32 = 0; i < len(xs); i++) {
+        var dx: float64 = xs[i] - mx;
+        var dy: float64 = ys[i] - my;
+        num = num + dx * dy;
+        dx2 = dx2 + dx * dx;
+        dy2 = dy2 + dy * dy;
+    }
+    var denom: float64 = math::sqrt(dx2 * dy2);
+    if (denom == 0.0) {
+        return 0.0;
+    }
+    return num / denom;
+}
+
+// ---------------------------------------------------------------------
+// Vector algebra
+// ---------------------------------------------------------------------
+
+fn vecAdd(a: float64[], b: float64[]): float64[] {
+    if (len(a) != len(b)) {
+        panic("ml::vecAdd: length mismatch");
+    }
+    var out: float64[] = [];
+    for (var i: int32 = 0; i < len(a); i++) {
+        push(out, a[i] + b[i]);
+    }
+    return out;
+}
+
+fn vecSub(a: float64[], b: float64[]): float64[] {
+    if (len(a) != len(b)) {
+        panic("ml::vecSub: length mismatch");
+    }
+    var out: float64[] = [];
+    for (var i: int32 = 0; i < len(a); i++) {
+        push(out, a[i] - b[i]);
+    }
+    return out;
+}
+
+fn vecScale(a: float64[], k: float64): float64[] {
+    var out: float64[] = [];
+    for (var i: int32 = 0; i < len(a); i++) {
+        push(out, a[i] * k);
+    }
+    return out;
+}
+
+fn dot(a: float64[], b: float64[]): float64 {
+    if (len(a) != len(b)) {
+        panic("ml::dot: length mismatch");
+    }
+    var acc: float64 = 0.0;
+    for (var i: int32 = 0; i < len(a); i++) {
+        acc = acc + a[i] * b[i];
+    }
+    return acc;
+}
+
+fn norm(a: float64[]): float64 {
+    return math::sqrt(dot(a, a));
+}
+
+// ---------------------------------------------------------------------
+// Matrix algebra (row-major: m[row][col], matrices are `list[]` -- see
+// the module-level comment above on why).
+// ---------------------------------------------------------------------
+
+fn zerosMatrix(rows: int32, cols: int32): list[] {
+    var m: list[] = [];
+    for (var r: int32 = 0; r < rows; r++) {
+        var row: float64[] = [];
+        for (var c: int32 = 0; c < cols; c++) {
+            push(row, 0.0);
+        }
+        push(m, row);
+    }
+    return m;
+}
+
+fn matRows(m: list[]): int32 {
+    return len(m);
+}
+
+fn matCols(m: list[]): int32 {
+    if (len(m) == 0) {
+        return 0;
+    }
+    var row0: float64[] = m[0];
+    return len(row0);
+}
+
+fn matAdd(a: list[], b: list[]): list[] {
+    if (matRows(a) != matRows(b) || matCols(a) != matCols(b)) {
+        panic("ml::matAdd: shape mismatch");
+    }
+    var out: list[] = [];
+    for (var r: int32 = 0; r < matRows(a); r++) {
+        var ra: float64[] = a[r];
+        var rb: float64[] = b[r];
+        push(out, vecAdd(ra, rb));
+    }
+    return out;
+}
+
+fn matScale(a: list[], k: float64): list[] {
+    var out: list[] = [];
+    for (var r: int32 = 0; r < matRows(a); r++) {
+        var ra: float64[] = a[r];
+        push(out, vecScale(ra, k));
+    }
+    return out;
+}
+
+fn matTranspose(a: list[]): list[] {
+    var rows: int32 = matRows(a);
+    var cols: int32 = matCols(a);
+    var out: list[] = [];
+    for (var c: int32 = 0; c < cols; c++) {
+        var col: float64[] = [];
+        for (var r: int32 = 0; r < rows; r++) {
+            var row: float64[] = a[r];
+            push(col, row[c]);
+        }
+        push(out, col);
+    }
+    return out;
+}
+
+// a (rows x inner) * b (inner x cols) -> (rows x cols)
+fn matMul(a: list[], b: list[]): list[] {
+    var rows: int32 = matRows(a);
+    var inner: int32 = matCols(a);
+    if (matRows(b) != inner) {
+        panic("ml::matMul: inner dimensions must match");
+    }
+    var cols: int32 = matCols(b);
+    var out: list[] = [];
+    for (var r: int32 = 0; r < rows; r++) {
+        var rowA: float64[] = a[r];
+        var outRow: float64[] = [];
+        for (var c: int32 = 0; c < cols; c++) {
+            var acc: float64 = 0.0;
+            for (var k: int32 = 0; k < inner; k++) {
+                var rowB: float64[] = b[k];
+                acc = acc + rowA[k] * rowB[c];
+            }
+            push(outRow, acc);
+        }
+        push(out, outRow);
+    }
+    return out;
+}
+
+// Matrix (rows x cols) times column vector (len == cols) -> vector (len == rows).
+fn matVecMul(a: list[], v: float64[]): float64[] {
+    if (matCols(a) != len(v)) {
+        panic("ml::matVecMul: dimension mismatch");
+    }
+    var out: float64[] = [];
+    for (var r: int32 = 0; r < matRows(a); r++) {
+        var row: float64[] = a[r];
+        push(out, dot(row, v));
+    }
+    return out;
+}
+
+// ---------------------------------------------------------------------
+// Activation functions (elementwise, useful for hand-rolled NN layers)
+// ---------------------------------------------------------------------
+
+fn sigmoid(x: float64): float64 {
+    return 1.0 / (1.0 + _exp(-x));
+}
+
+fn relu(x: float64): float64 {
+    if (x > 0.0) {
+        return x;
+    }
+    return 0.0;
+}
+
+fn tanh(x: float64): float64 {
+    var e2x: float64 = _exp(2.0 * x);
+    return (e2x - 1.0) / (e2x + 1.0);
+}
+
+// e^x via a fixed-iteration Taylor series -- Proton has no native exp(),
+// so this is a small self-contained helper (kept private: it's an
+// implementation detail of sigmoid/tanh, not a general-purpose export).
+private fn _exp(x: float64): float64 {
+    var term: float64 = 1.0;
+    var total: float64 = 1.0;
+    for (var i: int32 = 1; i <= 25; i++) {
+        term = term * x / i;
+        total = total + term;
+    }
+    return total;
+}
+
+fn sigmoidVec(xs: float64[]): float64[] {
+    var out: float64[] = [];
+    for (var i: int32 = 0; i < len(xs); i++) {
+        push(out, sigmoid(xs[i]));
+    }
+    return out;
+}
+
+fn reluVec(xs: float64[]): float64[] {
+    var out: float64[] = [];
+    for (var i: int32 = 0; i < len(xs); i++) {
+        push(out, relu(xs[i]));
+    }
+    return out;
+}
+
+// ---------------------------------------------------------------------
+// Simple linear regression (single feature): y = slope * x + intercept
+// Fit via closed-form least squares (no iteration needed for 1 feature).
+// ---------------------------------------------------------------------
+
+struct LinRegModel {
+    slope: float64;
+    intercept: float64;
+}
+
+fn linRegFit(xs: float64[], ys: float64[]): LinRegModel {
+    if (len(xs) != len(ys)) {
+        panic("ml::linRegFit: xs and ys must be the same length");
+    }
+    if (len(xs) < 2) {
+        panic("ml::linRegFit: need at least 2 points");
+    }
+    var mx: float64 = mean(xs);
+    var my: float64 = mean(ys);
+    var num: float64 = 0.0;
+    var denom: float64 = 0.0;
+    for (var i: int32 = 0; i < len(xs); i++) {
+        var dx: float64 = xs[i] - mx;
+        num = num + dx * (ys[i] - my);
+        denom = denom + dx * dx;
+    }
+    if (denom == 0.0) {
+        panic("ml::linRegFit: zero variance in xs");
+    }
+    var slope: float64 = num / denom;
+    var model: LinRegModel = LinRegModel{
+        slope = slope;
+        intercept = my - slope * mx;
+    };
+    return model;
+}
+
+fn linRegPredict(model: LinRegModel, x: float64): float64 {
+    return model.slope * x + model.intercept;
+}
+
+// R^2 goodness of fit for a fitted model against the training data.
+fn linRegRSquared(model: LinRegModel, xs: float64[], ys: float64[]): float64 {
+    var my: float64 = mean(ys);
+    var ssTot: float64 = 0.0;
+    var ssRes: float64 = 0.0;
+    for (var i: int32 = 0; i < len(xs); i++) {
+        var pred: float64 = linRegPredict(model, xs[i]);
+        var dTot: float64 = ys[i] - my;
+        var dRes: float64 = ys[i] - pred;
+        ssTot = ssTot + dTot * dTot;
+        ssRes = ssRes + dRes * dRes;
+    }
+    if (ssTot == 0.0) {
+        return 1.0;
+    }
+    return 1.0 - ssRes / ssTot;
+}
+
+// ---------------------------------------------------------------------
+// Multivariate linear regression via batch gradient descent.
+// xs: rows x features (a `list[]` of float64[] rows), ys: targets
+// (length == rows). Returns fitted weights (float64[], length ==
+// features) after `epochs` steps of batch gradient descent. Include an
+// extra constant-1 feature column in `xs` if you want a learned bias
+// term.
+// ---------------------------------------------------------------------
+
+fn gdFit(xs: list[], ys: float64[], learningRate: float64, epochs: int32): float64[] {
+    var rows: int32 = matRows(xs);
+    var features: int32 = matCols(xs);
+    if (len(ys) != rows) {
+        panic("ml::gdFit: ys length must match number of rows in xs");
+    }
+    var weights: float64[] = [];
+    for (var f: int32 = 0; f < features; f++) {
+        push(weights, 0.0);
+    }
+    for (var epoch: int32 = 0; epoch < epochs; epoch++) {
+        var gradients: float64[] = [];
+        for (var f: int32 = 0; f < features; f++) {
+            push(gradients, 0.0);
+        }
+        for (var r: int32 = 0; r < rows; r++) {
+            var row: float64[] = xs[r];
+            var pred: float64 = dot(row, weights);
+            var err: float64 = pred - ys[r];
+            for (var f: int32 = 0; f < features; f++) {
+                gradients[f] = gradients[f] + err * row[f];
+            }
+        }
+        for (var f: int32 = 0; f < features; f++) {
+            weights[f] = weights[f] - learningRate * (gradients[f] / rows);
+        }
+    }
+    return weights;
+}
+
+fn gdPredict(weights: float64[], x: float64[]): float64 {
+    return dot(weights, x);
+}
+
+// Mean squared error of a weight vector against a dataset.
+fn mse(weights: float64[], xs: list[], ys: float64[]): float64 {
+    var rows: int32 = matRows(xs);
+    var acc: float64 = 0.0;
+    for (var r: int32 = 0; r < rows; r++) {
+        var row: float64[] = xs[r];
+        var pred: float64 = dot(row, weights);
+        var err: float64 = pred - ys[r];
+        acc = acc + err * err;
+    }
+    return acc / rows;
+}
+
+// ---------------------------------------------------------------------
+// K-means clustering (Euclidean distance). Points and centroids are
+// each a `list[]` of float64[] rows (n x dims / k x dims).
+// ---------------------------------------------------------------------
+
+// Returns the index of the closest centroid to `point`.
+fn nearestCentroid(point: float64[], centroids: list[]): int32 {
+    var c0: float64[] = centroids[0];
+    var best: int32 = 0;
+    var bestDist: float64 = _sqDist(point, c0);
+    for (var i: int32 = 1; i < len(centroids); i++) {
+        var ci: float64[] = centroids[i];
+        var d: float64 = _sqDist(point, ci);
+        if (d < bestDist) {
+            bestDist = d;
+            best = i;
+        }
+    }
+    return best;
+}
+
+private fn _sqDist(a: float64[], b: float64[]): float64 {
+    var acc: float64 = 0.0;
+    for (var i: int32 = 0; i < len(a); i++) {
+        var d: float64 = a[i] - b[i];
+        acc = acc + d * d;
+    }
+    return acc;
+}
+
+// Runs Lloyd's algorithm for a fixed number of iterations (no dynamic
+// convergence check -- keeps this dependency-free and deterministic).
+// points: n x dims, initialCentroids: k x dims. Returns final centroids
+// (k x dims); use nearestCentroid(point, centroids) to assign labels.
+fn kMeansFit(points: list[], initialCentroids: list[], iterations: int32): list[] {
+    var k: int32 = matRows(initialCentroids);
+    var dims: int32 = matCols(initialCentroids);
+    var n: int32 = matRows(points);
+    var centroids: list[] = initialCentroids;
+
+    for (var iter: int32 = 0; iter < iterations; iter++) {
+        var sums: list[] = zerosMatrix(k, dims);
+        var counts: int32[] = [];
+        for (var c: int32 = 0; c < k; c++) {
+            push(counts, 0);
+        }
+
+        for (var p: int32 = 0; p < n; p++) {
+            var point: float64[] = points[p];
+            var assign: int32 = nearestCentroid(point, centroids);
+            counts[assign] = counts[assign] + 1;
+            var sumRow: float64[] = sums[assign];
+            for (var d: int32 = 0; d < dims; d++) {
+                sumRow[d] = sumRow[d] + point[d];
+            }
+        }
+
+        var next: list[] = [];
+        for (var c2: int32 = 0; c2 < k; c2++) {
+            var oldRow: float64[] = centroids[c2];
+            var sumRow2: float64[] = sums[c2];
+            var newRow: float64[] = [];
+            if (counts[c2] == 0) {
+                // No points assigned this round -- keep the old centroid
+                // instead of dividing by zero.
+                for (var d2: int32 = 0; d2 < dims; d2++) {
+                    push(newRow, oldRow[d2]);
+                }
+            } else {
+                for (var d3: int32 = 0; d3 < dims; d3++) {
+                    push(newRow, sumRow2[d3] / counts[c2]);
+                }
+            }
+            push(next, newRow);
+        }
+        centroids = next;
+    }
+    return centroids;
+}

@@ -1,0 +1,26 @@
+use collections;
+
+fn isEven(x: int): bool {
+    return x % 2 == 0;
+}
+
+fn timesTwo(x: int): int {
+    return x * 2;
+}
+
+fn main() {
+    var xs: int[] = [5, 3, 1, 4, 1, 5, 9, 2, 6];
+
+    io::out("range = ", collections::range(0, 10, 2));
+    io::out("map timesTwo = ", collections::map(xs, timesTwo));
+    io::out("filter even = ", collections::filter(xs, isEven));
+    io::out("find even = ", collections::find(xs, isEven));
+    io::out("contains 9 = ", collections::contains(xs, 9));
+    io::out("contains 99 = ", collections::contains(xs, 99));
+    io::out("reverse = ", collections::reverse(xs));
+    io::out("sort = ", collections::sort(xs));
+    io::out("unique = ", collections::unique(xs));
+
+    var nested: list[] = [[1, 2], [3], [4, 5]];
+    io::out("flatten = ", collections::flatten(nested));
+}

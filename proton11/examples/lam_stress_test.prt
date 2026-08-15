@@ -1,0 +1,29 @@
+// Stress test for Faz 1 LAM: each call to churn() builds several
+// concatenated strings inside its own call frame, then returns a number
+// (not a string), so nothing escapes the frame's region. Called many
+// times in a loop, this should hold steady-state memory flat -- before
+// the region fix, every concatenation result (and every toStringValue
+// coercion) would have permanently leaked via the interned string table.
+fn churn(n: int32): int32 {
+    var a: string = "prefix-";
+    var b: string = a + "middle-";
+    var c: string = b + "suffix";
+    var d: string = c + "-" + "extra" + "-" + "more";
+    if (d == "nonsense") {
+        return -1;
+    }
+    return n;
+}
+
+fn main() {
+    var total: int32 = 0;
+    var i: int32 = 0;
+    while (i < 200000) {
+        var r: int32 = churn(i);
+        if (r >= 0) {
+            total = total + 1;
+        }
+        i = i + 1;
+    }
+    io::out("done, total = ", total);
+}

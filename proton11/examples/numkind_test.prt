@@ -1,0 +1,29 @@
+// Exercises exact int64/uint64 storage beyond +-2^53-1, where a plain
+// double representation would lose precision.
+fn main() {
+    // 2^53 - 1 = 9007199254740991 (largest exact double integer).
+    // These are well beyond that.
+    const bigI: int64 = 9223372036854775807;   // INT64_MAX
+    const bigU: uint64 = 18446744073709551615; // UINT64_MAX
+
+    io::out("bigI = ", bigI);
+    io::out("bigU = ", bigU);
+
+    var a: int64 = 9223372036854775807;
+    var b: int64 = 9223372036854775806;
+    io::out("a == b: ", a == b);
+    io::out("a == a: ", a == a);
+
+    // A value one below INT64_MAX should still differ from INT64_MAX
+    // exactly (would collide under naive double rounding at this scale
+    // only far beyond 2^63, so this mostly checks the plumbing/printing).
+    var c: uint64 = 18446744073709551615;
+    var d: uint64 = 18446744073709551614;
+    io::out("c == d: ", c == d);
+
+    assert(a != b);
+    assert(c != d);
+    assert(a == a);
+
+    io::out("all numkind checks passed");
+}

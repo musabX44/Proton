@@ -1,0 +1,101 @@
+// examples/render_cube_demo.prt -- renders a lit, rotated cube to a PPM
+// file using the pure-Proton stdlib/render.prt rasterizer.
+//
+// Run: ./proton examples/render_cube_demo.prt
+// Output: /tmp/cube.ppm (view with e.g. `open /tmp/cube.ppm` or convert
+// to PNG with ImageMagick / Pillow).
+
+use render;
+use math;
+
+// Rotates a point around the Y axis by angleRad.
+fn rotateY(p: Vec3, angleRad: float64): Vec3 {
+    var c: float64 = math::cos(angleRad);
+    var s: float64 = math::sin(angleRad);
+    return render::vec3(
+        p.x * c + p.z * s,
+        p.y,
+        -p.x * s + p.z * c
+    );
+}
+
+fn rotateX(p: Vec3, angleRad: float64): Vec3 {
+    var c: float64 = math::cos(angleRad);
+    var s: float64 = math::sin(angleRad);
+    return render::vec3(
+        p.x,
+        p.y * c - p.z * s,
+        p.y * s + p.z * c
+    );
+}
+
+fn main() {
+    var W: int = 240;
+    var H: int = 180;
+
+    var fb: Framebuffer = render::makeFramebuffer(W, H, 8.0, 8.0, 14.0);
+
+    var cam: Camera = render::makeCamera(
+        render::vec3(0.0, 2.0, -5.0),
+        render::vec3(0.0, 0.0, 0.0),
+        render::vec3(0.0, 1.0, 0.0),
+        55.0, W / H, 0.1, 100.0
+    );
+
+    var lightDir: Vec3 = render::normalize(render::vec3(0.6, 0.8, -0.4));
+
+    // Unit cube corners, centered at origin.
+    var c000: Vec3 = render::vec3(-1.0, -1.0, -1.0);
+    var c001: Vec3 = render::vec3(-1.0, -1.0,  1.0);
+    var c010: Vec3 = render::vec3(-1.0,  1.0, -1.0);
+    var c011: Vec3 = render::vec3(-1.0,  1.0,  1.0);
+    var c100: Vec3 = render::vec3( 1.0, -1.0, -1.0);
+    var c101: Vec3 = render::vec3( 1.0, -1.0,  1.0);
+    var c110: Vec3 = render::vec3( 1.0,  1.0, -1.0);
+    var c111: Vec3 = render::vec3( 1.0,  1.0,  1.0);
+
+    var angleY: float64 = math::degToRad(35.0);
+    var angleX: float64 = math::degToRad(-20.0);
+
+    // Rotate every corner (Y then X) and nudge back so it sits in front
+    // of the camera looking at the origin.
+    c000 = rotateX(rotateY(c000, angleY), angleX);
+    c001 = rotateX(rotateY(c001, angleY), angleX);
+    c010 = rotateX(rotateY(c010, angleY), angleX);
+    c011 = rotateX(rotateY(c011, angleY), angleX);
+    c100 = rotateX(rotateY(c100, angleY), angleX);
+    c101 = rotateX(rotateY(c101, angleY), angleX);
+    c110 = rotateX(rotateY(c110, angleY), angleX);
+    c111 = rotateX(rotateY(c111, angleY), angleX);
+
+    var red: float64[] = [210.0, 60.0, 60.0];
+    var green: float64[] = [60.0, 200.0, 90.0];
+    var blue: float64[] = [70.0, 110.0, 220.0];
+    var yellow: float64[] = [220.0, 200.0, 60.0];
+    var magenta: float64[] = [200.0, 70.0, 200.0];
+    var cyan: float64[] = [70.0, 200.0, 200.0];
+
+    var ambient: float64 = 0.18;
+
+    // +Z face
+    render::drawTriangle(fb, cam, c001, c101, c111, lightDir, red, ambient);
+    render::drawTriangle(fb, cam, c001, c111, c011, lightDir, red, ambient);
+    // -Z face
+    render::drawTriangle(fb, cam, c100, c000, c010, lightDir, green, ambient);
+    render::drawTriangle(fb, cam, c100, c010, c110, lightDir, green, ambient);
+    // +X face
+    render::drawTriangle(fb, cam, c101, c100, c110, lightDir, blue, ambient);
+    render::drawTriangle(fb, cam, c101, c110, c111, lightDir, blue, ambient);
+    // -X face
+    render::drawTriangle(fb, cam, c000, c001, c011, lightDir, yellow, ambient);
+    render::drawTriangle(fb, cam, c000, c011, c010, lightDir, yellow, ambient);
+    // +Y face
+    render::drawTriangle(fb, cam, c011, c111, c110, lightDir, magenta, ambient);
+    render::drawTriangle(fb, cam, c011, c110, c010, lightDir, magenta, ambient);
+    // -Y face
+    render::drawTriangle(fb, cam, c000, c100, c101, lightDir, cyan, ambient);
+    render::drawTriangle(fb, cam, c000, c101, c001, lightDir, cyan, ambient);
+
+    render::writePPM(fb, "/tmp/cube.ppm");
+    io::out("Rendered /tmp/cube.ppm (", W, "x", H, ")");
+}

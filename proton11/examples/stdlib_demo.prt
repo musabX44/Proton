@@ -1,0 +1,24 @@
+use math;
+use random;
+
+fn main() {
+    io::out("PI = ", math::PI, "  E = ", math::E);
+    io::out("sqrt(2) = ", math::sqrt(2.0));
+    io::out("sqrt(81) = ", math::sqrt(81.0));
+    io::out("abs(-5.5) = ", math::abs(-5.5));
+    io::out("min(3,7) = ", math::min(3.0, 7.0), "  max(3,7) = ", math::max(3.0, 7.0));
+    io::out("clamp(15, 0, 10) = ", math::clamp(15.0, 0.0, 10.0));
+    io::out("pow(2, 10) = ", math::pow(2.0, 10));
+    io::out("pow(2, -2) = ", math::pow(2.0, -2));
+    io::out("sin(PI/2) = ", math::sin(math::PI / 2.0));
+    io::out("cos(0) = ", math::cos(0.0));
+    io::out("floor(3.7) = ", math::floor(3.7), "  ceil(3.2) = ", math::ceil(3.2));
+    io::out("round(3.5) = ", math::round(3.5));
+    io::out("degToRad(180) = ", math::degToRad(180.0));
+
+    random::seed(42);
+    io::out("--- random (seed 42) ---");
+    for (var i: int32 = 0; i < 5; i++) {
+        io::out("nextInt(1,100) = ", random::nextInt(1, 100), "  nextFloat() = ", random::nextFloat());
+    }
+}

@@ -1,0 +1,17 @@
+fn main() {
+    var enc: string = net::urlEncode("hello world & friends");
+    io::out("encoded: ", enc, "\n");
+    var dec: string = net::urlDecode(enc);
+    io::out("decoded: ", dec, "\n");
+
+    var ip: string = net::resolve("example.com");
+    io::out("example.com -> ", ip, "\n");
+
+    var ms: float = net::ping("example.com", 3000);
+    io::out("ping ms: ", ms, "\n");
+
+    var opts: map = { "method": "GET", "url": "http://example.com/", "timeout": 5000 };
+    var res: map = net::request(opts);
+    io::out("status: ", res["status"], "\n");
+    io::out("body bytes: ", len(res["body"]), "\n");
+}

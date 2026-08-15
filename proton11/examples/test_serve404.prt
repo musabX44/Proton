@@ -1,0 +1,9 @@
+fn h(req: map) {
+    if (req["path"] == "/notfound") {
+        return { "status": 404, "body": "nope" };
+    }
+    return { "status": 200, "body": "ok" };
+}
+fn main() {
+    net::serve(8081, h);
+}

@@ -1,0 +1,119 @@
+// stdlib/os.prt -- pure-Proton operating-system info library.
+//
+// Loaded via `use os;`. Every top-level name here lives under the
+// `os::` namespace: os::platform(), os::env("PATH"), etc.
+//
+// Backed by Proton's OS-facing natives: `sys::exec(cmd)` (runs a
+// command in a subshell, returns captured stdout as a string),
+// `sys::env`/`sys::setenv` (read/write an environment variable of this
+// process), `sys::args()` (extra CLI args passed to the running
+// script), and `sys::pid`/`sys::ppid`/`sys::exit` (this process's pid,
+// its parent's pid, and immediate termination). Of these, `sys::exec`
+// is the odd one out: it always runs in a fresh child subshell, so
+// anything it reads (uname, nproc, pwd, ...) has to be captured as text
+// and trimmed -- it can't be used for setenv/pid/exit, which is why
+// those go through their own dedicated natives instead.
+//
+//   - platform/arch/cpu_count/hostname/cwd/home are implemented by
+//     shelling out to the corresponding POSIX command via `sys::exec`
+//     and trimming the trailing newline it captures.
+//   - env/args/set_env/exit/pid/parent_pid are thin wrappers over the
+//     matching `sys::*` natives, kept here so callers only need
+//     `use os;`.
+
+use string;
+
+private fn _trimTrailingNewline(s: string): string {
+    var n: int = len(s);
+    while (n > 0 && (s[n - 1] == "\n" || s[n - 1] == "\r")) {
+        n = n - 1;
+    }
+    return string::substring(s, 0, n);
+}
+
+// ---------------------------------------------------------------------
+// System info (via sys::exec)
+// ---------------------------------------------------------------------
+
+// e.g. "Linux", "Darwin" -- the raw `uname -s` output.
+fn platform(): string {
+    return _trimTrailingNewline(sys::exec("uname -s"));
+}
+
+// e.g. "x86_64", "arm64" -- the raw `uname -m` output.
+fn arch(): string {
+    return _trimTrailingNewline(sys::exec("uname -m"));
+}
+
+// Minimal non-negative decimal parser -- Proton's stdlib has no native
+// string->int cast, so this walks the digits by hand. Returns 0 for a
+// blank/unparseable string.
+private fn _parseUint(s: string): int {
+    var n: int = len(s);
+    var value: int = 0;
+    for (var i: int = 0; i < n; i++) {
+        var c: string = s[i];
+        var code: int = char::code(c);
+        if (code < 48 || code > 57) {
+            break;
+        }
+        value = value * 10 + (code - 48);
+    }
+    return value;
+}
+
+fn cpu_count(): int {
+    var out: string = _trimTrailingNewline(sys::exec("nproc 2>/dev/null || sysctl -n hw.ncpu"));
+    return _parseUint(out);
+}
+
+fn hostname(): string {
+    return _trimTrailingNewline(sys::exec("hostname"));
+}
+
+fn cwd(): string {
+    return _trimTrailingNewline(sys::exec("pwd"));
+}
+
+fn home(): string {
+    return _trimTrailingNewline(sys::exec("echo $HOME"));
+}
+
+// ---------------------------------------------------------------------
+// Environment / args (thin wrappers over existing natives)
+// ---------------------------------------------------------------------
+
+fn env(name: string): string {
+    return sys::env(name);
+}
+
+fn args(): string[] {
+    return sys::args();
+}
+
+// ---------------------------------------------------------------------
+// Environment mutation / process control
+// ---------------------------------------------------------------------
+//
+// Backed by native opcodes added alongside this module: OP_SYS_SETENV,
+// OP_SYS_EXIT, OP_SYS_PID, OP_SYS_PPID. Unlike `sys::exec` (which always
+// runs in a disposable child subshell), these act directly on -- or
+// simply read from -- the running Proton process itself.
+
+fn set_env(name: string, value: string): void {
+    sys::setenv(name, value);
+}
+
+// Flushes output and terminates the process immediately with `code`.
+// Never returns.
+fn exit(code: int): void {
+    sys::exit(code);
+}
+
+fn pid(): int {
+    return sys::pid();
+}
+
+fn parent_pid(): int {
+    return sys::ppid();
+}

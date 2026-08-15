@@ -1,0 +1,30 @@
+fn main() {
+    var t0: int64 = time::now();
+    io::out("now: ", t0);
+
+    var tick0: int64 = time::ticks();
+    time::sleep(20);
+    var tick1: int64 = time::ticks();
+    io::out("ticks elapsed >= 20000us: ", (tick1 - tick0) >= 20000);
+
+    io::out("clock: ", time::clock());
+
+    var formatted: string = time::format(t0, "%Y-%m-%d %H:%M:%S");
+    io::out("formatted: ", formatted);
+
+    var parsed: int64 = time::parse("2026-08-04 09:15:00", "%Y-%m-%d %H:%M:%S");
+    io::out("parsed: ", parsed);
+
+    var reformatted: string = time::format(parsed, "%Y-%m-%d %H:%M:%S");
+    io::out("roundtrip: ", reformatted);
+
+    var pathVal: string = sys::env("PATH");
+    io::out("PATH len: ", len(pathVal));
+    io::out("NONEXISTENT_VAR_XYZ: ", sys::env("NONEXISTENT_VAR_XYZ"));
+
+    var args: string[] = sys::args();
+    io::out("argc: ", len(args));
+    for (var i: int = 0; i < len(args); i++) {
+        io::out("arg[", i, "] = ", args[i]);
+    }
+}

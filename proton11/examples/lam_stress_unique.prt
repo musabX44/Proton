@@ -1,0 +1,25 @@
+// Unlike lam_stress_test.prt, this produces a DISTINCT string value on
+// every iteration (embeds the loop counter), so string interning can't
+// dedupe it down to one cached allocation -- this is what actually
+// stresses the leak in the pre-LAM allocator.
+fn churn(n: int32): int32 {
+    var a: string = "item-" + n;
+    var b: string = a + "-tag";
+    if (b == "nonsense") {
+        return -1;
+    }
+    return n;
+}
+
+fn main() {
+    var total: int32 = 0;
+    var i: int32 = 0;
+    while (i < 20000000) {
+        var r: int32 = churn(i);
+        if (r >= 0) {
+            total = total + 1;
+        }
+        i = i + 1;
+    }
+    io::out("done, total = ", total);
+}

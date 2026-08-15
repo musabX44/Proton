@@ -1,0 +1,219 @@
+// stdlib/string.prt -- pure-Proton string utility library.
+//
+// Loaded via `use string;`. Every top-level name here lives under the
+// `string::` namespace: string::upper(s), string::split(s, ","), etc.
+//
+// Proton strings are immutable, region-scoped values; every function
+// below builds and returns a *new* string (or list of strings) rather
+// than mutating in place. Character access goes through `s[i]`, which
+// yields a fresh 1-character string (see OP_GET_INDEX), and `char::code`
+// / `char::fromCode` handle the numeric <-> character conversions used
+// by upper/lower.
+
+// ---------------------------------------------------------------------
+// Basics
+// ---------------------------------------------------------------------
+
+fn len(s: string): int {
+    return len(s);
+}
+
+fn upper(s: string): string {
+    var result: string = "";
+    for (var i: int = 0; i < len(s); i++) {
+        var c: string = s[i];
+        var code: int = char::code(c);
+        if (code >= 97 && code <= 122) {
+            result = result + char::fromCode(code - 32);
+        } else {
+            result = result + c;
+        }
+    }
+    return result;
+}
+
+fn lower(s: string): string {
+    var result: string = "";
+    for (var i: int = 0; i < len(s); i++) {
+        var c: string = s[i];
+        var code: int = char::code(c);
+        if (code >= 65 && code <= 90) {
+            result = result + char::fromCode(code + 32);
+        } else {
+            result = result + c;
+        }
+    }
+    return result;
+}
+
+private fn _isSpace(c: string): bool {
+    return c == " " || c == "\t" || c == "\n" || c == "\r";
+}
+
+fn trim(s: string): string {
+    var start: int = 0;
+    var end: int = len(s);
+    while (start < end && _isSpace(s[start])) {
+        start = start + 1;
+    }
+    while (end > start && _isSpace(s[end - 1])) {
+        end = end - 1;
+    }
+    return substring(s, start, end);
+}
+
+// ---------------------------------------------------------------------
+// Search / predicates
+// ---------------------------------------------------------------------
+
+// Index of the first occurrence of `sub` in `s`, or -1 if not found.
+fn indexOf(s: string, sub: string): int {
+    var sLen: int = len(s);
+    var subLen: int = len(sub);
+    if (subLen == 0) {
+        return 0;
+    }
+    if (subLen > sLen) {
+        return -1;
+    }
+    for (var i: int = 0; i <= sLen - subLen; i++) {
+        var matched: bool = true;
+        for (var j: int = 0; j < subLen; j++) {
+            if (s[i + j] != sub[j]) {
+                matched = false;
+                break;
+            }
+        }
+        if (matched) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+fn contains(s: string, sub: string): bool {
+    return indexOf(s, sub) >= 0;
+}
+
+fn starts_with(s: string, prefix: string): bool {
+    var pLen: int = len(prefix);
+    if (pLen > len(s)) {
+        return false;
+    }
+    return substring(s, 0, pLen) == prefix;
+}
+
+fn ends_with(s: string, suffix: string): bool {
+    var sufLen: int = len(suffix);
+    var sLen: int = len(s);
+    if (sufLen > sLen) {
+        return false;
+    }
+    return substring(s, sLen - sufLen, sLen) == suffix;
+}
+
+fn char_at(s: string, index: int): string {
+    return s[index];
+}
+
+// ---------------------------------------------------------------------
+// Slicing / building
+// ---------------------------------------------------------------------
+
+// Characters [start, end). Out-of-range bounds are clamped rather than
+// erroring, matching the forgiving style of most Proton stdlib helpers.
+fn substring(s: string, start: int, end: int): string {
+    var sLen: int = len(s);
+    var lo: int = start;
+    var hi: int = end;
+    if (lo < 0) {
+        lo = 0;
+    }
+    if (hi > sLen) {
+        hi = sLen;
+    }
+    if (lo >= hi) {
+        return "";
+    }
+    var result: string = "";
+    for (var i: int = lo; i < hi; i++) {
+        result = result + s[i];
+    }
+    return result;
+}
+
+fn repeat(s: string, n: int): string {
+    var result: string = "";
+    for (var i: int = 0; i < n; i++) {
+        result = result + s;
+    }
+    return result;
+}
+
+fn reverse(s: string): string {
+    var result: string = "";
+    for (var i: int = len(s) - 1; i >= 0; i--) {
+        result = result + s[i];
+    }
+    return result;
+}
+
+fn replace(s: string, old: string, replacement: string): string {
+    var oldLen: int = len(old);
+    if (oldLen == 0) {
+        return s;
+    }
+    var result: string = "";
+    var i: int = 0;
+    var sLen: int = len(s);
+    while (i < sLen) {
+        if (i <= sLen - oldLen && substring(s, i, i + oldLen) == old) {
+            result = result + replacement;
+            i = i + oldLen;
+        } else {
+            result = result + s[i];
+            i = i + 1;
+        }
+    }
+    return result;
+}
+
+// ---------------------------------------------------------------------
+// Split / join
+// ---------------------------------------------------------------------
+
+fn split(s: string, sep: string): string[] {
+    var parts: string[] = [];
+    var sepLen: int = len(sep);
+    if (sepLen == 0) {
+        for (var i: int = 0; i < len(s); i++) {
+            push(parts, s[i]);
+        }
+        return parts;
+    }
+    var start: int = 0;
+    var sLen: int = len(s);
+    var i: int = 0;
+    while (i <= sLen - sepLen) {
+        if (substring(s, i, i + sepLen) == sep) {
+            push(parts, substring(s, start, i));
+            i = i + sepLen;
+            start = i;
+        } else {
+            i = i + 1;
+        }
+    }
+    push(parts, substring(s, start, sLen));
+    return parts;
+}
+
+fn join(list: string[], sep: string): string {
+    var result: string = "";
+    for (var i: int = 0; i < len(list); i++) {
+        if (i > 0) {
+            result = result + sep;
+        }
+        result = result + list[i];
+    }
+    return result;
+}

@@ -1,0 +1,273 @@
+// stdlib/render.prt -- pure-Proton 3D software rasterizer.
+//
+// Loaded via `use render;`. Everything here is ordinary Proton: no new
+// opcodes, no C changes. Output is a filled RGB framebuffer (a flat
+// float64[] triple per pixel) that render::writePPM() flushes to disk
+// through sys::exec (Proton has no native file-write yet).
+//
+// Pipeline: model space -> world (identity here) -> view -> perspective
+// projection -> viewport -> screen-space triangle rasterization with a
+// Z-buffer and per-triangle flat Lambertian shading.
+
+use math;
+
+// ---------------------------------------------------------------------
+// Vec3
+// ---------------------------------------------------------------------
+
+struct Vec3 {
+    x: float64;
+    y: float64;
+    z: float64;
+}
+
+fn vec3(x: float64, y: float64, z: float64): Vec3 {
+    return Vec3{ x = x; y = y; z = z; };
+}
+
+fn addV(a: Vec3, b: Vec3): Vec3 {
+    return vec3(a.x + b.x, a.y + b.y, a.z + b.z);
+}
+
+fn subV(a: Vec3, b: Vec3): Vec3 {
+    return vec3(a.x - b.x, a.y - b.y, a.z - b.z);
+}
+
+fn scaleV(a: Vec3, s: float64): Vec3 {
+    return vec3(a.x * s, a.y * s, a.z * s);
+}
+
+fn dot(a: Vec3, b: Vec3): float64 {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+fn cross(a: Vec3, b: Vec3): Vec3 {
+    return vec3(
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x
+    );
+}
+
+fn lengthV(a: Vec3): float64 {
+    return math::sqrt(dot(a, a));
+}
+
+fn normalize(a: Vec3): Vec3 {
+    var len: float64 = lengthV(a);
+    if (len < 0.00000001) {
+        return vec3(0.0, 0.0, 0.0);
+    }
+    return scaleV(a, 1.0 / len);
+}
+
+// ---------------------------------------------------------------------
+// Camera: a hand-rolled look-at + perspective projection, applied
+// directly per-vertex (no general 4x4 matrix stack -- kept simple and
+// explicit since Proton has no operator overloading for matrix types).
+// ---------------------------------------------------------------------
+
+struct Camera {
+    eye: Vec3;
+    forward: Vec3;
+    right: Vec3;
+    up: Vec3;
+    fovYRad: float64;
+    aspect: float64;
+    near: float64;
+    far: float64;
+}
+
+fn makeCamera(eye: Vec3, target: Vec3, worldUp: Vec3, fovYDeg: float64, aspect: float64, near: float64, far: float64): Camera {
+    var fwd: Vec3 = normalize(subV(target, eye));
+    var right: Vec3 = normalize(cross(fwd, worldUp));
+    var up: Vec3 = cross(right, fwd);
+    return Camera{
+        eye = eye;
+        forward = fwd;
+        right = right;
+        up = up;
+        fovYRad = math::degToRad(fovYDeg);
+        aspect = aspect;
+        near = near;
+        far = far;
+    };
+}
+
+// Transforms a world-space point into screen space.
+// Returns [screenX, screenY, depth01, viewZ] as a float64[4].
+// depth01 in [0,1] (near..far) is used for the Z-buffer; viewZ (camera-
+// space, positive = in front) is used to reject points behind the eye.
+fn projectToScreen(cam: Camera, p: Vec3, screenW: int, screenH: int): float64[] {
+    var rel: Vec3 = subV(p, cam.eye);
+    var viewX: float64 = dot(rel, cam.right);
+    var viewY: float64 = dot(rel, cam.up);
+    var viewZ: float64 = dot(rel, cam.forward);
+
+    var tanHalfFov: float64 = math::tan(cam.fovYRad / 2.0);
+    var safeZ: float64 = viewZ;
+    if (safeZ < 0.0001) {
+        safeZ = 0.0001;
+    }
+    var ndcX: float64 = viewX / (safeZ * tanHalfFov * cam.aspect);
+    var ndcY: float64 = viewY / (safeZ * tanHalfFov);
+
+    var sx: float64 = (ndcX + 1.0) * 0.5 * (screenW - 1);
+    var sy: float64 = (1.0 - ndcY) * 0.5 * (screenH - 1);
+
+    var depth01: float64 = (viewZ - cam.near) / (cam.far - cam.near);
+
+    var out: float64[] = [sx, sy, depth01, viewZ];
+    return out;
+}
+
+// ---------------------------------------------------------------------
+// Framebuffer + Z-buffer
+// ---------------------------------------------------------------------
+
+struct Framebuffer {
+    width: int;
+    height: int;
+    color: float64[];  // flat, 3 doubles per pixel (r,g,b in 0..255)
+    depth: float64[];  // 1 double per pixel
+}
+
+fn makeFramebuffer(width: int, height: int, bgR: float64, bgG: float64, bgB: float64): Framebuffer {
+    var color: float64[] = [];
+    var depth: float64[] = [];
+    var n: int = width * height;
+    for (var i: int = 0; i < n; i++) {
+        push(color, bgR);
+        push(color, bgG);
+        push(color, bgB);
+        push(depth, 1.0e18);
+    }
+    return Framebuffer{ width = width; height = height; color = color; depth = depth; };
+}
+
+fn fbSetPixel(fb: Framebuffer, x: int, y: int, r: float64, g: float64, b: float64): void {
+    if (x < 0 || y < 0 || x >= fb.width || y >= fb.height) {
+        return;
+    }
+    var idx: int = (y * fb.width + x) * 3;
+    fb.color[idx] = r;
+    fb.color[idx + 1] = g;
+    fb.color[idx + 2] = b;
+}
+
+fn fbGetDepth(fb: Framebuffer, x: int, y: int): float64 {
+    return fb.depth[y * fb.width + x];
+}
+
+fn fbSetDepth(fb: Framebuffer, x: int, y: int, d: float64): void {
+    fb.depth[y * fb.width + x] = d;
+}
+
+// ---------------------------------------------------------------------
+// Triangle rasterization: barycentric, Z-buffered, flat-shaded.
+// s0/s1/s2 are the [sx, sy, depth01, viewZ] outputs of projectToScreen.
+// worldNormal is the (already normalized) face normal in world space,
+// lightDir points FROM the surface TOWARD the light (normalized).
+// baseColor is the material's [r,g,b] in 0..255. ambient is 0..1.
+// ---------------------------------------------------------------------
+
+fn edgeFn(ax: float64, ay: float64, bx: float64, by: float64, px: float64, py: float64): float64 {
+    return (bx - ax) * (py - ay) - (by - ay) * (px - ax);
+}
+
+fn fillTriangle(fb: Framebuffer, s0: float64[], s1: float64[], s2: float64[],
+                 worldNormal: Vec3, lightDir: Vec3, baseColor: float64[], ambient: float64): void {
+    var x0: float64 = s0[0]; var y0: float64 = s0[1]; var z0: float64 = s0[2]; var vz0: float64 = s0[3];
+    var x1: float64 = s1[0]; var y1: float64 = s1[1]; var z1: float64 = s1[2]; var vz1: float64 = s1[3];
+    var x2: float64 = s2[0]; var y2: float64 = s2[1]; var z2: float64 = s2[2]; var vz2: float64 = s2[3];
+
+    // Reject triangles with any vertex behind the camera (cheap near-clip).
+    if (vz0 <= 0.0001 || vz1 <= 0.0001 || vz2 <= 0.0001) {
+        return;
+    }
+
+    var area: float64 = edgeFn(x0, y0, x1, y1, x2, y2);
+    if (math::abs(area) < 0.00001) {
+        return; // degenerate
+    }
+
+    // Lambert term, clamped to [0, 1], plus ambient floor.
+    var ndotl: float64 = dot(worldNormal, lightDir);
+    var lambert: float64 = math::max(0.0, ndotl);
+    var intensity: float64 = math::clamp(ambient + (1.0 - ambient) * lambert, 0.0, 1.0);
+
+    var r: float64 = baseColor[0] * intensity;
+    var g: float64 = baseColor[1] * intensity;
+    var b: float64 = baseColor[2] * intensity;
+
+    var minX: int = math::floor(math::max(0.0, math::min(x0, math::min(x1, x2))));
+    var maxX: int = math::floor(math::min(fb.width - 1, math::max(x0, math::max(x1, x2))));
+    var minY: int = math::floor(math::max(0.0, math::min(y0, math::min(y1, y2))));
+    var maxY: int = math::floor(math::min(fb.height - 1, math::max(y0, math::max(y1, y2))));
+
+    for (var py: int = minY; py <= maxY; py++) {
+        for (var px: int = minX; px <= maxX; px++) {
+            var fx: float64 = px + 0.5;
+            var fy: float64 = py + 0.5;
+
+            var w0: float64 = edgeFn(x1, y1, x2, y2, fx, fy);
+            var w1: float64 = edgeFn(x2, y2, x0, y0, fx, fy);
+            var w2: float64 = edgeFn(x0, y0, x1, y1, fx, fy);
+
+            var inside: bool = false;
+            if (area > 0.0) {
+                inside = w0 >= 0.0 && w1 >= 0.0 && w2 >= 0.0;
+            } else {
+                inside = w0 <= 0.0 && w1 <= 0.0 && w2 <= 0.0;
+            }
+
+            if (inside) {
+                var b0: float64 = w0 / area;
+                var b1: float64 = w1 / area;
+                var b2: float64 = w2 / area;
+                var pz: float64 = b0 * z0 + b1 * z1 + b2 * z2;
+
+                if (pz < fbGetDepth(fb, px, py)) {
+                    fbSetDepth(fb, px, py, pz);
+                    fbSetPixel(fb, px, py, r, g, b);
+                }
+            }
+        }
+    }
+}
+
+// Convenience: project + fill a single triangle (positions in world
+// space) in one call, computing its flat face normal automatically.
+fn drawTriangle(fb: Framebuffer, cam: Camera, p0: Vec3, p1: Vec3, p2: Vec3,
+                  lightDir: Vec3, baseColor: float64[], ambient: float64): void {
+    var normal: Vec3 = normalize(cross(subV(p1, p0), subV(p2, p0)));
+    var s0: float64[] = projectToScreen(cam, p0, fb.width, fb.height);
+    var s1: float64[] = projectToScreen(cam, p1, fb.width, fb.height);
+    var s2: float64[] = projectToScreen(cam, p2, fb.width, fb.height);
+    fillTriangle(fb, s0, s1, s2, normal, lightDir, baseColor, ambient);
+}
+
+// ---------------------------------------------------------------------
+// PPM export (P3 ASCII). Written via sys::exec since Proton has no
+// native file-write opcode -- header via `>`, then one appended `>>`
+// per scanline to stay well under the shell's argv/line length limits.
+// ---------------------------------------------------------------------
+
+fn clampByte(v: float64): int {
+    return math::floor(math::clamp(v, 0.0, 255.0) + 0.5);
+}
+
+fn writePPM(fb: Framebuffer, path: string): void {
+    sys::exec("printf 'P3\n" + fb.width + " " + fb.height + "\n255\n' > " + path);
+    for (var y: int = 0; y < fb.height; y++) {
+        var line: string = "";
+        for (var x: int = 0; x < fb.width; x++) {
+            var idx: int = (y * fb.width + x) * 3;
+            var r: int = clampByte(fb.color[idx]);
+            var g: int = clampByte(fb.color[idx + 1]);
+            var b: int = clampByte(fb.color[idx + 2]);
+            line = line + r + " " + g + " " + b + " ";
+        }
+        sys::exec("printf '%s\n' '" + line + "' >> " + path);
+    }
+}

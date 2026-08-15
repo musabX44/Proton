@@ -1,0 +1,9 @@
+fn takesByte(x: byte): void {
+    io::out("got byte: ", x);
+}
+
+fn main() {
+    takesByte(42);
+    io::out("now calling with a string, should fail:");
+    takesByte("oops");
+}

@@ -1,0 +1,50 @@
+
+const MAX_USERS: int = 100;
+var greeting: string = "merhaba";
+
+fn isAdult(age: int): bool {
+    if (age >= 18) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+fn sumTo(n: int): int {
+    var total: int = 0;
+    for (var i: int = 1; i <= n; i++) {
+        if (i == 4) {
+            continue;
+        }
+        if (i > 8) {
+            break;
+        }
+        total = total + i;
+    }
+    return total;
+}
+
+fn main() {
+    io::out(greeting, " MAX_USERS=", MAX_USERS);
+
+    var age: int = 20;
+    if (isAdult(age)) {
+        io::out("Adult");
+    } else {
+        io::out("Minor");
+    }
+
+    var n: int = 5;
+    while (n > 0) {
+        io::out("countdown: ", n);
+        n--;
+    }
+
+    io::out("sumTo(10) skipping 4, stopping after 8 = ", sumTo(10));
+
+    assert(1 + 1 == 2);
+    io::out("assert passed");
+
+    var pi: float = 3.14;
+    io::out("pi = ", pi, " doubled = ", pi * 2);
+}

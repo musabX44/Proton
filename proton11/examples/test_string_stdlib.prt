@@ -1,0 +1,19 @@
+use string;
+
+fn main() {
+    io::out("len('hello') = ", string::len("hello"));
+    io::out("upper = ", string::upper("Hello World"));
+    io::out("lower = ", string::lower("Hello World"));
+    io::out("trim = '", string::trim("  hi there  "), "'");
+    io::out("split = ", string::split("a,b,,c", ","));
+    io::out("join = ", string::join(string::split("a,b,c", ","), "-"));
+    io::out("replace = ", string::replace("foo bar foo", "foo", "baz"));
+    io::out("contains = ", string::contains("hello world", "wor"));
+    io::out("starts_with = ", string::starts_with("hello", "he"));
+    io::out("ends_with = ", string::ends_with("hello", "lo"));
+    io::out("substring = ", string::substring("hello world", 6, 11));
+    io::out("repeat = ", string::repeat("ab", 3));
+    io::out("reverse = ", string::reverse("hello"));
+    io::out("char_at = ", string::char_at("hello", 1));
+    io::out("indexOf = ", string::indexOf("hello world", "world"));
+}

@@ -1,0 +1,772 @@
+// =============================================================================
+// features_extended.prt
+// -----------------------------------------------------------------------------
+// Proton dilinin TÜM özelliklerinin, en temelden en gelişmişe, ayrı ayrı ve
+// izole bölümler halinde gösterildiği kapsamlı referans/eğitim dosyası.
+//
+// Yapı: her bölüm "sectionNN_..." adlı bir fonksiyon içinde yaşıyor, main()
+// hepsini sırayla çağırıyor. Böylece hem "tek başına okunabilir örnek" hem de
+// "çalıştır, gör" ihtiyacı aynı anda karşılanıyor. Her bölüm başında ne
+// gösterdiğini açıklayan bir yorum bloğu var.
+//
+// Çalıştırma:
+//   ./proton examples/features_extended.prt
+// =============================================================================
+
+
+// -----------------------------------------------------------------------------
+// GLOBAL TANIMLAR (top-level) — struct, enum, const/var, fn hepsi burada
+// yaşamalı; yalnızca fonksiyon GÖVDESİ içinde bunlar tanımlanamaz (struct/enum
+// için), var/const local'de de olabilir ama global init yalnızca literal.
+// -----------------------------------------------------------------------------
+
+use math;
+use math as m2;      // modül alias örneği — artık m2:: de geçerli
+use string;
+use collections;
+use os;
+use random;
+use ml;
+
+// --- Bölüm 2 için globaller: const/var, tip anotasyonu zorunlu ---
+const MAX_USERS: int = 100;
+var greeting: string = "merhaba";
+const APP_VERSION: string = "6.0.0";
+
+// --- Bölüm 6 için struct/enum tanımları (yalnızca top-level olabilir) ---
+struct Point {
+    x: int;
+    y: int;
+}
+
+struct Pair<K, V> {
+    key: K;
+    val: V;
+}
+
+struct Box<T> {
+    value: T;
+}
+
+struct LinkedRecord {
+    id: int;
+    name: string;
+    active: bool;
+}
+
+enum Color { Red, Green, Blue }                    // 0,1,2 otomatik
+enum StatusCode { OK = 200, NotFound = 404, ServerError = 500 } // manuel değer
+
+// =============================================================================
+// BÖLÜM 1 — Yorumlar, io::out / io::in, assert / panic
+// =============================================================================
+
+fn section01_basics_io() {
+    io::out("=== Bölüm 1: Temel I/O, yorumlar, assert ===");
+
+    // tek satır yorum böyle yazılır (bu satırın kendisi bir örnek)
+    io::out("io::out değişken sayıda argüman alır:", 1, 2, 3, true, "son");
+
+    assert(1 + 1 == 2);
+    io::out("assert(1+1==2) geçti");
+
+    // panic() de var ama burada ÇAĞIRMIYORUZ çünkü programı anında durdurur.
+    // Kullanımı: panic("beklenmedik durum");
+    io::out("panic() koşulsuz durdurur, bu dosyada tetiklenmiyor (gösterim amaçlı)");
+}
+
+// =============================================================================
+// BÖLÜM 2 — Değişkenler: var / const, global vs local, tip anotasyonu
+// =============================================================================
+
+fn section02_variables() {
+    io::out("=== Bölüm 2: var/const, global/local ===");
+
+    io::out("global greeting =", greeting, " MAX_USERS =", MAX_USERS, " APP_VERSION =", APP_VERSION);
+
+    // local var/const herhangi bir ifadeyle başlatılabilir (global'de bu yasak)
+    var computedLocal: int = MAX_USERS + string::len("proton");
+    const localConst: float64 = m2::PI * 2.0; // fonksiyon çağrısıyla local const OK
+
+    io::out("computedLocal =", computedLocal, " localConst =", localConst);
+
+    var age: int = 26;
+    age = age + 1; // var yeniden atanabilir
+    io::out("age (yeniden atandı) =", age);
+
+    // const localConst = 5; // derleme hatası olurdu -- const yeniden atanamaz
+}
+
+// =============================================================================
+// BÖLÜM 3 — Tip sistemi: tüm ilkel tipler, aralık denetimi, int64/uint64
+// (NumKind) tam hassasiyet, generic fonksiyonlar, generic struct'lar
+// =============================================================================
+
+fn describeRange(): void {
+    io::out("int8 aralığı: -128..127, uint8: 0..255, vs.");
+}
+
+fn maxOf<T>(a: T, b: T): T {
+    if (a > b) { return a; }
+    return b;
+}
+
+fn section03_type_system() {
+    io::out("=== Bölüm 3: Tip sistemi ===");
+
+    // --- Tüm ilkel tipler tek tek ---
+    var flag: bool = true;
+    var ch: char = "A"; // char tek karakterlik string ile temsil edilir (tek tırnak yok)
+    var s: string = "proton";
+    var by: byte = 255;
+    var i8: int8 = 120;
+    var i16: int16 = 30000;
+    var i32: int32 = 2000000000;
+    var i64: int64 = 9223372036854775807; // INT64_MAX
+    var u: uint = 4000000000;
+    var u8: uint8 = 200;
+    var u16: uint16 = 60000;
+    var u32: uint32 = 4000000000;
+    var u64: uint64 = 18446744073709551615; // UINT64_MAX
+    var f32: float32 = 3.14;
+    var f64: float64 = 2.718281828;
+    var dec: decimal = 1.5;
+
+    io::out("bool:", flag, " char-cmp:", ch, " string:", s);
+    io::out("byte:", by, " int8:", i8, " int16:", i16, " int32:", i32, " int64:", i64);
+    io::out("uint:", u, " uint8:", u8, " uint16:", u16, " uint32:", u32, " uint64:", u64);
+    io::out("float32:", f32, " float64:", f64, " decimal:", dec);
+
+    describeRange();
+
+    // --- Aralık denetimi: bir aralık-içi atama başarılı olur ---
+    var safeI8: int8 = -100;
+    io::out("safeI8 =", safeI8, "(aralık içi, sorun yok)");
+    // var overI8: int8 = 200; // ÇALIŞMA ZAMANI HATASI verirdi -- yorumda bırakıldı
+
+    // --- int64/uint64 tam hassasiyet (NumKind) ---
+    const bigI: int64 = 9223372036854775807;
+    var aBig: int64 = 9223372036854775807;
+    var bBig: int64 = 9223372036854775806;
+    io::out("INT64_MAX =", bigI, " aBig != bBig ? ", aBig != bBig); // true -- double olsaydı ayırt edilemeyebilirdi
+    assert(aBig != bBig);
+
+    const bigU: uint64 = 18446744073709551615;
+    io::out("UINT64_MAX =", bigU);
+
+    // --- Generic fonksiyon: açık tip argümanı ZORUNLU (inferred değil) ---
+    io::out("maxOf<int>(3,5) =", maxOf<int>(3, 5));
+    io::out("maxOf<float64>(1.5,2.5) =", maxOf<float64>(1.5, 2.5));
+    // Not: '>' operatörü yalnızca sayısal operandlar için tanımlı, bu yüzden
+    // maxOf<string>(...) burada kullanılmıyor -- generic'ler tipi kontrol etmez
+    // ama operatörün kendisi yine de sayısal operand bekler.
+
+    // --- Generic struct: Box<T> ve Pair<K,V> ---
+    var b: Box = Box<int>{ value = 42; };
+    io::out("Box<int>.value =", b.value);
+
+    var p: Pair = Pair<string, int>{ key = "age"; val = 30; };
+    io::out("Pair<string,int> =", p.key, "=", p.val);
+}
+
+// =============================================================================
+// BÖLÜM 4 — Kontrol akışı: if/else, while, for (klasik), for..in, switch
+// (fall-through!), defer (LIFO)
+// =============================================================================
+
+fn classifyAge(age: int): string {
+    if (age >= 18) {
+        return "Yetişkin";
+    } else if (age >= 13) {
+        return "Genç";
+    } else {
+        return "Çocuk";
+    }
+}
+
+fn deferDemo(): void {
+    defer { io::out("  [defer] 1. tanımlanan, LIFO'da SON çalışan"); }
+    defer { io::out("  [defer] 2. tanımlanan, LIFO'da ORTA çalışan"); }
+    defer { io::out("  [defer] 3. tanımlanan, LIFO'da İLK çalışan"); }
+    io::out("  [defer] fonksiyon gövdesi çalışıyor");
+    return;
+}
+
+fn section04_control_flow() {
+    io::out("=== Bölüm 4: Kontrol akışı ===");
+
+    // --- if / else if / else ---
+    io::out("classifyAge(20) =", classifyAge(20));
+    io::out("classifyAge(15) =", classifyAge(15));
+    io::out("classifyAge(5)  =", classifyAge(5));
+
+    // --- while ---
+    var n: int = 5;
+    while (n > 0) {
+        io::out("  while geri sayım:", n);
+        n--;
+    }
+
+    // --- for (klasik üç parçalı) + break + continue ---
+    var total: int = 0;
+    for (var i: int = 1; i <= 10; i++) {
+        if (i == 4) { continue; } // 4'ü atla
+        if (i > 8) { break; }     // 8'den sonra dur
+        total = total + i;
+    }
+    io::out("  for/break/continue toplam (1..8 hariç 4) =", total);
+
+    // --- for ... in (dizi üzerinde gezinme) ---
+    var xs: int[] = [10, 20, 30];
+    for (x in xs) {
+        io::out("  for..in eleman:", x);
+    }
+
+    // --- switch / case / default (C-tarzı fall-through!) ---
+    for (var day: int = 1; day <= 7; day++) {
+        switch (day) {
+            case 1:
+            case 2:
+            case 3:
+            case 4:
+            case 5:
+                io::out("  gün", day, "-> Hafta içi");
+                break;
+            case 6:
+            case 7:
+                io::out("  gün", day, "-> Hafta sonu");
+                break;
+            default:
+                io::out("  gün", day, "-> Geçersiz");
+        }
+    }
+
+    // --- defer: her return'den önce, LIFO sırayla ---
+    io::out("  defer demo başlıyor:");
+    deferDemo();
+    io::out("  defer demo bitti (çıktı sırasına dikkat et)");
+}
+
+// =============================================================================
+// BÖLÜM 5 — Fonksiyonlar: zorunlu dönüş tipi, recursion, first-class fn
+// değerleri, "closure YOK" kısıtı
+// =============================================================================
+
+fn factorial(n: int): int {
+    if (n <= 1) { return 1; }
+    return n * factorial(n - 1); // recursion serbest
+}
+
+fn voidFn(): void {
+    io::out("  void dönen fonksiyon da dönüş tipini yazmak zorunda");
+    return;
+}
+
+fn square(x: int): int { return x * x; }
+fn cube(x: int): int { return x * x * x; }
+
+fn applyFn(f: fn, x: int): int {
+    return f(x); // first-class fonksiyon çağrısı
+}
+
+fn section05_functions() {
+    io::out("=== Bölüm 5: Fonksiyonlar ===");
+
+    io::out("factorial(6) =", factorial(6));
+    voidFn();
+
+    // first-class fn: değişkene atama, parametre olarak geçirme, yeniden atama
+    io::out("applyFn(square, 5) =", applyFn(square, 5)); // 25
+    var g: fn = square;
+    io::out("g(7) via var g: fn = square =", g(7));      // 49
+    g = cube;
+    io::out("g(4) yeniden atandıktan sonra (cube) =", g(4)); // 64
+
+    // Not: closure/upvalue capture YOK -- fn değerleri yalnızca kod+isme
+    // işaret eder, tanım kapsamındaki hiçbir local'i "yakalayamaz". Bu
+    // yüzden collections::map/filter/reduce'a geçirilen callback'ler
+    // state'siz olmalı (Bölüm 13'te tekrar görülecek).
+    io::out("  (closure yok -- first-class fn'ler stateless olmalı)");
+}
+
+// =============================================================================
+// BÖLÜM 6 — struct ve enum (yalnızca top-level tanımlanabilir)
+// =============================================================================
+
+fn section06_struct_enum() {
+    io::out("=== Bölüm 6: struct / enum ===");
+
+    // --- basit struct ---
+    var pt: Point = Point{ x = 3; y = 4; };
+    io::out("Point{x,y} =", pt.x, ",", pt.y);
+
+    var rec: LinkedRecord = LinkedRecord{ id = 1; name = "proton"; active = true; };
+    io::out("LinkedRecord =", rec.id, rec.name, rec.active);
+
+    // --- generic struct'lar tekrar (Bölüm 3'te tanıtıldı, burada tekrar) ---
+    var pair: Pair = Pair<string, int>{ key = "score"; val = 99; };
+    io::out("Pair<string,int> tekrar =", pair.key, "=", pair.val);
+
+    // --- enum: otomatik değer ataması ---
+    io::out("Color::Red =", Color::Red, " Color::Green =", Color::Green, " Color::Blue =", Color::Blue);
+
+    // --- enum: manuel değer ataması ---
+    io::out("StatusCode::OK =", StatusCode::OK);
+    io::out("StatusCode::NotFound =", StatusCode::NotFound);
+    io::out("StatusCode::ServerError =", StatusCode::ServerError);
+
+    // enum üyeleri salt-okunur -- StatusCode::OK = 201; derleme hatası olurdu
+}
+
+// =============================================================================
+// BÖLÜM 7 — Diziler (Lists) ve Map'ler: literal, indeksleme, alias vs kopya,
+// dinamik büyüme (push), listCopy, map temel işlemler
+// =============================================================================
+
+fn makeListInFunction(): int[] {
+    // LAM (Bölüm 9) bu return'ü otomatik güvenli hale getiriyor
+    var xs: int[] = [1, 2, 3];
+    return xs;
+}
+
+fn section07_lists_maps() {
+    io::out("=== Bölüm 7: Diziler ve Map'ler ===");
+
+    // --- dizi literal + indeksleme ---
+    var nums: int[] = [1, 2, 3, 4];
+    io::out("nums[1] =", nums[1]);
+    nums[1] = 99; // indeks ataması da bir ifade
+    io::out("nums sonrası (nums[1]=99) len =", len(nums), " nums[1] =", nums[1]);
+
+    // --- ALIAS uyarısı: var b: T[] = a KOPYALAMAZ ---
+    var a: int[] = [1, 2, 3];
+    var bAlias: int[] = a; // aynı ObjList'e referans
+    bAlias[0] = 111;
+    io::out("alias örneği -- a[0] da değişti mi?", a[0], "(evet, aynı liste)");
+
+    // --- gerçek kopya: listCopy ---
+    var c: float64[] = [1.0, 2.0];
+    var d: float64[] = listCopy(c);
+    d[0] = 999.0;
+    io::out("listCopy örneği -- c[0] etkilenmedi mi?", c[0], "(evet, bağımsız kopya)");
+
+    // --- dinamik büyüme: push (sabit boyutlu literal'i büyütür) ---
+    var xs: float64[] = [];
+    push(xs, 1.0);
+    push(xs, 2.0);
+    push(xs, 3.0);
+    io::out("push ile büyüyen liste, len =", len(xs), " içerik =", xs);
+
+    // --- fonksiyondan liste döndürmek güvenli (LAM promote eder) ---
+    io::out("makeListInFunction() =", makeListInFunction());
+
+    // --- map: yalnızca string literal anahtarlar ---
+    var m: map = {"a": 1, "b": 2};
+    io::out("m[\"a\"] =", m["a"], " len(m) =", len(m));
+    m["c"] = 3; // yeni anahtar eklenebilir
+    io::out("m[\"c\"] eklendikten sonra len(m) =", len(m));
+}
+
+// =============================================================================
+// BÖLÜM 8 — Hata değerleri ve `?` (postfix) operatörü
+// =============================================================================
+
+fn readMaybeMissingFile(path: string): string {
+    // fs::read başarısız olursa VAL_ERROR döner; `?` burada erken return eder
+    var content: string = fs::read(path)?;
+    return content;
+}
+
+fn section08_error_values() {
+    io::out("=== Bölüm 8: Hata değerleri ve ? operatörü ===");
+
+    // Önce gerçek bir dosya yazıp başarı yolunu gösterelim
+    fs::write("/tmp/proton_features_demo.txt", "merhaba proton");
+    var okContent: string = fs::read("/tmp/proton_features_demo.txt")?;
+    io::out("fs::read başarı yolu:", okContent);
+
+    // `?` zincirleme: readMaybeMissingFile var olan dosyayla çağrılırsa sorun yok
+    var chained: string = readMaybeMissingFile("/tmp/proton_features_demo.txt")?;
+    io::out("zincirleme ? ile okunan:", chained);
+
+    io::out("  (Not: var olmayan bir dosya ile çağrılırsa 'Uncaught error' ile");
+    io::out("   program durur -- bu dosyada kasıtlı olarak tetiklenmiyor.)");
+}
+
+// =============================================================================
+// BÖLÜM 9 — Bellek modeli (LAM): region-tabanlı, GC yok, return-promote
+// =============================================================================
+
+fn buildConcatenatedString(prefix: string, n: int): string {
+    // Bu fonksiyonun kendi region'ında üretilen bir string; return edildiğinde
+    // otomatik olarak çağıranın region'ına promote edilir (dangling pointer yok).
+    var result: string = prefix;
+    for (var i: int = 0; i < n; i++) {
+        result = result + "*";
+    }
+    return result;
+}
+
+fn section09_lam_memory_model() {
+    io::out("=== Bölüm 9: LAM (bellek modeli) ===");
+
+    io::out("region-tabanlı bellek: her çağrı kendi arena'sını alır, dönüşte yıkılır.");
+    io::out("return edilen değerler otomatik promote edilir:", buildConcatenatedString(">>", 5));
+
+    // Aynı fonksiyonu çok kez çağırıp return ETMEDİĞİMİZ (kendi frame'inde
+    // tüketilen) geçicileri gösterelim -- bunlar kendi region'larıyla temizlenir.
+    var acc: int = 0;
+    for (var i: int = 0; i < 1000; i++) {
+        var throwaway: string = "geçici-" + string::upper("x"); // return edilmiyor, frame'de tüketiliyor
+        acc = acc + len(throwaway);
+    }
+    io::out("1000 geçici string üretildi, toplam uzunluk (region'lar anında temizlendi):", acc);
+}
+
+// =============================================================================
+// BÖLÜM 10 — Native built-in'ler: len, push, listCopy, char::, fs::, sys::,
+// time:: (net:: Bölüm 18'de ayrı işleniyor)
+// =============================================================================
+
+fn section10_native_builtins() {
+    io::out("=== Bölüm 10: Native built-in'ler ===");
+
+    // --- len / push / listCopy zaten Bölüm 7'de görüldü, burada char:: ---
+    var code: int = char::code("A");
+    io::out("char::code(\"A\") =", code);
+    io::out("char::fromCode(66) =", char::fromCode(66));
+
+    // --- fs:: ---
+    io::out("fs::exists(/tmp) =", fs::exists("/tmp"));
+    fs::write("/tmp/proton_native_demo.txt", "native builtin testi");
+    io::out("fs::read geri okuma:", fs::read("/tmp/proton_native_demo.txt"));
+
+    // --- sys:: ---
+    io::out("sys::pid() =", sys::pid());
+    io::out("sys::ppid() =", sys::ppid());
+    sys::setenv("PROTON_DEMO_VAR", "hello");
+    io::out("sys::env(\"PROTON_DEMO_VAR\") =", sys::env("PROTON_DEMO_VAR"));
+    io::out("sys::args() =", sys::args());
+    io::out("sys::exec(\"echo native-exec-test\") =", sys::exec("echo native-exec-test"));
+
+    // --- time:: ---
+    io::out("time::now() (unix ms) =", time::now());
+    io::out("time::ticks() (monotonic us) =", time::ticks());
+    io::out("time::clock() (cpu saniye) =", time::clock());
+    var before: int64 = time::now();
+    time::sleep(5); // 5ms uyu
+    var after: int64 = time::now();
+    io::out("time::sleep(5) sonrası geçen süre >= 0 ms ?", (after - before) >= 0);
+    io::out("time::format(now, \"%Y-%m-%d\") =", time::format(time::now(), "%Y-%m-%d"));
+}
+
+// =============================================================================
+// BÖLÜM 11 — Modül sistemi (`use`): alias, private, idempotent yükleme
+// =============================================================================
+
+fn section11_module_system() {
+    io::out("=== Bölüm 11: Modül sistemi (use) ===");
+
+    // math hem "math::" hem alias'ı "m2::" ile erişilebilir (dosya başında
+    // hem "use math;" hem "use math as m2;" yapıldı)
+    io::out("math::PI =", math::PI, " m2::PI (alias) =", m2::PI);
+    assert(math::PI == m2::PI);
+
+    io::out("aynı modülü tekrar 'use' etmek yeniden yüklemez (idempotent).");
+    io::out("private fn/var/const modül dışından erişilemez -- stdlib/*.prt");
+    io::out("dosyalarında bazı yardımcı fonksiyonlar bu şekilde gizlenmiş olabilir.");
+}
+
+// =============================================================================
+// BÖLÜM 12 — stdlib/string komple API turu
+// =============================================================================
+
+fn section12_stdlib_string() {
+    io::out("=== Bölüm 12: stdlib/string ===");
+
+    var raw: string = "  Hello, World!  ";
+    io::out("string::len(\"hello\") =", string::len("hello"));
+    io::out("string::trim =", string::trim(raw));
+    io::out("string::upper(trim) =", string::upper(string::trim(raw)));
+    io::out("string::lower(trim) =", string::lower(string::trim(raw)));
+    io::out("string::split(\"a,b,,c\", \",\") =", string::split("a,b,,c", ","));
+    io::out("string::join([x,y,z], \"/\") =", string::join(["x", "y", "z"], "/"));
+    io::out("string::replace(\"foo bar foo\",\"foo\",\"baz\") =", string::replace("foo bar foo", "foo", "baz"));
+    io::out("string::contains(\"proton lang\",\"lang\") =", string::contains("proton lang", "lang"));
+    io::out("string::starts_with(\"hello\",\"he\") =", string::starts_with("hello", "he"));
+    io::out("string::ends_with(\"hello\",\"lo\") =", string::ends_with("hello", "lo"));
+    io::out("string::substring(\"hello\",1,3) =", string::substring("hello", 1, 3));
+    io::out("string::repeat(\"ab\",3) =", string::repeat("ab", 3));
+    io::out("string::reverse(\"abc\") =", string::reverse("abc"));
+    io::out("string::char_at(\"hello\",1) =", string::char_at("hello", 1));
+    io::out("string::indexOf(\"hello world\",\"world\") =", string::indexOf("hello world", "world"));
+
+    // doğrudan karakter indeksleme de çalışır (native OP_GET_INDEX)
+    io::out("\"hello\"[1] (doğrudan indeksleme) =", "hello"[1]);
+}
+
+// =============================================================================
+// BÖLÜM 13 — stdlib/collections komple API turu (map/filter/reduce/find/...)
+// =============================================================================
+
+fn isEven(x: int): bool { return x % 2 == 0; }
+fn timesTwo(x: int): int { return x * 2; }
+
+fn section13_stdlib_collections() {
+    io::out("=== Bölüm 13: stdlib/collections ===");
+
+    var xs: int[] = [5, 3, 1, 4, 1, 5, 9, 2, 6];
+
+    io::out("collections::map(xs, timesTwo) =", collections::map(xs, timesTwo));
+    io::out("collections::filter(xs, isEven) =", collections::filter(xs, isEven));
+    io::out("collections::find(xs, isEven) =", collections::find(xs, isEven));
+    io::out("collections::contains(xs, 9) =", collections::contains(xs, 9));
+    io::out("collections::reverse(xs) =", collections::reverse(xs));
+    io::out("collections::sort(xs) =", collections::sort(xs));
+    io::out("collections::unique(xs) =", collections::unique(xs));
+    io::out("collections::flatten([[1,2],[3]]) =", collections::flatten([[1, 2], [3]]));
+    io::out("collections::range(0,10,2) =", collections::range(0, 10, 2));
+
+    // reduce: state'siz callback + initial parametresiyle "dışarıdan değer" geçirme deseni
+    // (closure olmadığı için toplamı reduce ile INT DEĞİL "list[]" tipinde
+    // biriktirmek gerektiğinden, burada basit bir maksimum-bulma deseni
+    // gösteriyoruz: reduce'un callback'i (acc, elem) -> acc şeklinde çalışır)
+    io::out("  (reduce callback'leri stateless olmalı -- closure yok, Bölüm 5)");
+}
+
+// =============================================================================
+// BÖLÜM 14 — stdlib/os komple API turu
+// =============================================================================
+
+fn section14_stdlib_os() {
+    io::out("=== Bölüm 14: stdlib/os ===");
+
+    io::out("os::platform() =", os::platform());
+    io::out("os::arch() =", os::arch());
+    io::out("os::cpu_count() =", os::cpu_count());
+    io::out("os::hostname() =", os::hostname());
+    io::out("os::cwd() =", os::cwd());
+    io::out("os::home() =", os::home());
+
+    os::set_env("PROTON_OS_DEMO", "42");
+    io::out("os::env(\"PROTON_OS_DEMO\") =", os::env("PROTON_OS_DEMO"));
+    io::out("os::args() =", os::args());
+    io::out("os::pid() =", os::pid(), " os::parent_pid() =", os::parent_pid());
+
+    io::out("  (os::exit(code) burada çağrılmıyor -- programı anında sonlandırırdı)");
+}
+
+// =============================================================================
+// BÖLÜM 15 — stdlib/math komple API turu
+// =============================================================================
+
+fn section15_stdlib_math() {
+    io::out("=== Bölüm 15: stdlib/math ===");
+
+    io::out("math::PI =", math::PI, " math::E =", math::E);
+    io::out("math::abs(-5.5) =", math::abs(-5.5));
+    io::out("math::absInt(-9) =", math::absInt(-9));
+    io::out("math::min(3.0,7.0) =", math::min(3.0, 7.0), " math::max(3.0,7.0) =", math::max(3.0, 7.0));
+    io::out("math::clamp(15.0, 0.0, 10.0) =", math::clamp(15.0, 0.0, 10.0));
+    io::out("math::lerp(0.0, 10.0, 0.5) =", math::lerp(0.0, 10.0, 0.5));
+    io::out("math::degToRad(180.0) =", math::degToRad(180.0));
+    io::out("math::radToDeg(math::PI) =", math::radToDeg(math::PI));
+    io::out("math::pow(2.0, 10) =", math::pow(2.0, 10));
+    io::out("math::sqrt(2.0) =", math::sqrt(2.0));
+    io::out("math::sin(math::PI/2.0) =", math::sin(math::PI / 2.0));
+    io::out("math::cos(0.0) =", math::cos(0.0));
+    io::out("math::tan(0.0) =", math::tan(0.0));
+    io::out("math::floor(3.7) =", math::floor(3.7));
+    io::out("math::ceil(3.2) =", math::ceil(3.2));
+    io::out("math::round(3.5) =", math::round(3.5));
+
+    io::out("  (math::sqrt(-1.0) panic ile durur -- burada tetiklenmiyor)");
+}
+
+// =============================================================================
+// BÖLÜM 16 — stdlib/random komple API turu (LCG, deterministik seed)
+// =============================================================================
+
+fn section16_stdlib_random() {
+    io::out("=== Bölüm 16: stdlib/random ===");
+
+    random::seed(42); // deterministik/tekrarlanabilir sonuçlar için
+    for (var i: int32 = 0; i < 3; i++) {
+        io::out("  random::nextInt(1,100) =", random::nextInt(1, 100));
+    }
+    io::out("random::next() (ham 32-bit) =", random::next());
+    io::out("random::nextFloat() [0,1) =", random::nextFloat());
+    io::out("random::nextBool(0.5) =", random::nextBool(0.5));
+}
+
+// =============================================================================
+// BÖLÜM 17 — stdlib/ml komple API turu: vektör istatistikleri, cebir,
+// aktivasyon fonksiyonları, lineer regresyon, k-means
+// =============================================================================
+
+fn section17_stdlib_ml() {
+    io::out("=== Bölüm 17: stdlib/ml ===");
+
+    var xs: float64[] = [1.0, 2.0, 3.0, 4.0, 5.0];
+    var ys: float64[] = [2.0, 4.0, 6.0, 8.0, 10.0];
+
+    // --- vektör istatistikleri ---
+    io::out("ml::sum(xs) =", ml::sum(xs));
+    io::out("ml::mean(xs) =", ml::mean(xs));
+    io::out("ml::variance(xs) =", ml::variance(xs));
+    io::out("ml::stddev(xs) =", ml::stddev(xs));
+    io::out("ml::vecMin(xs) =", ml::vecMin(xs), " ml::vecMax(xs) =", ml::vecMax(xs));
+    io::out("ml::correlation(xs, ys) =", ml::correlation(xs, ys));
+
+    // --- vektör cebiri ---
+    io::out("ml::vecAdd(xs, ys) =", ml::vecAdd(xs, ys));
+    io::out("ml::vecSub(ys, xs) =", ml::vecSub(ys, xs));
+    io::out("ml::vecScale(xs, 2.0) =", ml::vecScale(xs, 2.0));
+    io::out("ml::dot(xs, ys) =", ml::dot(xs, ys));
+    io::out("ml::norm(xs) =", ml::norm(xs));
+
+    // --- matris cebiri ---
+    var mat: list[] = ml::zerosMatrix(2, 2);
+    io::out("ml::zerosMatrix(2,2) =", mat);
+    io::out("ml::matRows(mat) =", ml::matRows(mat), " ml::matCols(mat) =", ml::matCols(mat));
+    var matT: list[] = ml::matTranspose(mat);
+    io::out("ml::matTranspose(mat) =", matT);
+
+    // --- aktivasyon fonksiyonları ---
+    io::out("ml::sigmoid(0.0) =", ml::sigmoid(0.0));
+    io::out("ml::relu(-3.0) =", ml::relu(-3.0), " ml::relu(3.0) =", ml::relu(3.0));
+    io::out("ml::tanh(0.0) =", ml::tanh(0.0));
+    io::out("ml::sigmoidVec(xs) =", ml::sigmoidVec(xs));
+    io::out("ml::reluVec(xs) =", ml::reluVec(xs));
+
+    // --- lineer regresyon (kapalı form) ---
+    var model: LinRegModel = ml::linRegFit(xs, ys);
+    io::out("linRegFit -> slope =", model.slope, " intercept =", model.intercept);
+    io::out("linRegPredict(model, 6.0) =", ml::linRegPredict(model, 6.0));
+    io::out("linRegRSquared =", ml::linRegRSquared(model, xs, ys));
+
+    // --- k-means ---
+    var points: list[] = [[1.0, 1.0], [1.5, 2.0], [8.0, 8.0], [9.0, 9.0]];
+    var initialCentroids: list[] = [[1.0, 1.0], [9.0, 9.0]];
+    var clustered: list[] = ml::kMeansFit(points, initialCentroids, 5);
+    io::out("ml::kMeansFit sonrası merkezler =", clustered);
+}
+
+// =============================================================================
+// BÖLÜM 18 — net:: ağ kütüphanesi (native, senkron, düz-HTTP)
+// Not: gerçek ağ erişimi ortam kısıtlarına bağlı olabilir; bu bölüm çoğunlukla
+// yerel/hata-toleranslı çağrılarla API şeklini gösteriyor.
+// =============================================================================
+
+fn appHandler(req: map) {
+    return { "status": 200, "body": "{\"ok\": true}" };
+}
+
+fn section18_net() {
+    io::out("=== Bölüm 18: net:: ağ kütüphanesi ===");
+
+    io::out("net::urlEncode(\"a b/c\") =", net::urlEncode("a b/c"));
+    io::out("net::urlDecode(\"a%20b%2Fc\") =", net::urlDecode("a%20b%2Fc"));
+
+    // resolve/ping/get gibi dış ağ gerektiren çağrılar ortam kısıtlı olabilir;
+    // API şeklini göstermek için burada bırakılıyor ama sonucu değerlendirmeden
+    // yalnızca çağrı imzasını belgeleyelim (çalışma zamanı bağımlı):
+    io::out("  net::resolve(host), net::ping(host,ms), net::get(url), net::post(url,body):");
+    io::out("  bunlar dış ağ erişimi gerektirir, imza referansı için MANUAL.md Bölüm 18'e bkz.");
+
+    io::out("  net::request(options: map) -> {status,body,headers} esnek istek şekli.");
+    io::out("  net::connect/send/recv/close -> outbound TCP/UDP soket API'si.");
+    io::out("  net::serve(port, handler) -> blocking HTTP sunucu (burada BAŞLATILMIYOR,");
+    io::out("  çünkü scripti sonsuz döngüde bloklardı). appHandler fonksiyonu yukarıda");
+    io::out("  tanımlı, imza: fn appHandler(req: map) { return {status:200, body:...}; }");
+}
+
+// =============================================================================
+// BÖLÜM 19 — Operatörler: aritmetik, karşılaştırma, mantıksal, bitwise,
+// artırma/azaltma, öncelik sırası
+// =============================================================================
+
+fn section19_operators() {
+    io::out("=== Bölüm 19: Operatörler ===");
+
+    // --- aritmetik ---
+    io::out("7 + 3 =", 7 + 3, " 7 - 3 =", 7 - 3, " 7 * 3 =", 7 * 3, " 7 / 3 =", 7 / 3, " 7 % 3 =", 7 % 3);
+
+    // --- karşılaştırma ---
+    io::out("5 == 5:", 5 == 5, " 5 != 6:", 5 != 6, " 3 < 4:", 3 < 4, " 4 <= 4:", 4 <= 4, " 5 > 4:", 5 > 4, " 5 >= 5:", 5 >= 5);
+
+    // --- mantıksal ---
+    io::out("true && false =", true && false, " true || false =", true || false, " !true =", !true);
+
+    // --- bitwise ---
+    var a: int = 12;
+    var bBit: int = 10;
+    io::out("a & b =", a & bBit, " a | b =", a | bBit, " a ^ b =", a ^ bBit, " ~a =", ~a);
+    io::out("a << 2 =", a << 2, " a >> 2 =", a >> 2);
+
+    // --- öncelik sırası testi: | düşük, & yüksek -> 1 | (2 & 3) ---
+    io::out("1 | 2 & 3 =", 1 | 2 & 3, "(& önce çalışır: 2&3=2, sonra 1|2=3)");
+
+    // --- artırma/azaltma (postfix) ---
+    var counter: int = 0;
+    counter++;
+    counter++;
+    counter--;
+    io::out("counter (++,++,--  sonrası) =", counter);
+
+    // --- unary eksi ve mantıksal değil birlikte ---
+    io::out("-(5) =", -5, " !(false) =", !false);
+}
+
+// =============================================================================
+// BÖLÜM 20 — Sık yapılan hatalar (yalnızca AÇIKLAMA, çalıştırılmıyor)
+// Bu bölüm kasıtlı olarak derleme/çalışma hatası ÜRETMEZ; MANUAL.md Bölüm 19
+// ile birebir örtüşen tuzakları metin olarak özetler.
+// =============================================================================
+
+fn section20_pitfalls_recap() {
+    io::out("=== Bölüm 20: Sık tuzaklar (özet, tetiklenmiyor) ===");
+    io::out("1) global var/const yalnızca literal ile başlar (fonksiyon çağrısı OLMAZ).");
+    io::out("2) 'var b: T[] = a;' KOPYALAMAZ, alias'tır -- listCopy() kullan.");
+    io::out("3) 'new' rezerve kelime -- kendi parametre adın olarak kullanma.");
+    io::out("4) switch'te break unutma -- fall-through otomatik.");
+    io::out("5) collections:: callback'leri stateless olmalı (closure yok).");
+    io::out("6) math::sqrt(-1.0) panic'tir, '?' ile yakalanamaz.");
+    io::out("7) generic çağrılarda tip argümanı zorunlu: max<int>(3,5).");
+    io::out("8) sys::exec ile env değişkeni set edilemez -- sys::setenv kullan.");
+}
+
+// =============================================================================
+// MAIN — tüm bölümleri sırayla çalıştırır
+// =============================================================================
+
+fn main() {
+    io::out("############################################################");
+    io::out("# Proton features_extended.prt -- kapsamlı özellik turu");
+    io::out("############################################################");
+
+    section01_basics_io();
+    section02_variables();
+    section03_type_system();
+    section04_control_flow();
+    section05_functions();
+    section06_struct_enum();
+    section07_lists_maps();
+    section08_error_values();
+    section09_lam_memory_model();
+    section10_native_builtins();
+    section11_module_system();
+    section12_stdlib_string();
+    section13_stdlib_collections();
+    section14_stdlib_os();
+    section15_stdlib_math();
+    section16_stdlib_random();
+    section17_stdlib_ml();
+    section18_net();
+    section19_operators();
+    section20_pitfalls_recap();
+
+    io::out("############################################################");
+    io::out("# Tüm bölümler tamamlandı.");
+    io::out("############################################################");
+}

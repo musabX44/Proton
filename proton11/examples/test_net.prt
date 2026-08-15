@@ -1,0 +1,4 @@
+fn main() {
+    var r: string = net::get("http://example.com/");
+    io::out("got bytes: ", len(r));
+}

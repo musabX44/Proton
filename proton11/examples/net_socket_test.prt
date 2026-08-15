@@ -1,0 +1,15 @@
+fn main() {
+    var h: int = net::connect("example.com", 80, "tcp");
+    io::out("handle = ", h);
+
+    var req: string = "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n";
+    var sent: int = net::send(h, req);
+    io::out("sent bytes = ", sent);
+
+    var data: string = net::recv(h, 200);
+    io::out("received (first 200 bytes):");
+    io::out(data);
+
+    net::close(h);
+    io::out("closed.");
+}

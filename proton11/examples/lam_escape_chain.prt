@@ -1,0 +1,28 @@
+// Three-level escape: build() returns to wrapper(), wrapper() returns to
+// main()'s loop. Each level should ride the region chain up one step,
+// never touching permanent storage until it reaches main's own region
+// (which never gets destroyed until the program ends) -- so permanent
+// heap should stay flat here too, same as the single-level case.
+fn build(n: int32): string {
+    var a: string = "item-" + n;
+    var b: string = a + "-tag";
+    return b;
+}
+
+fn wrapper(n: int32): string {
+    var s: string = build(n);
+    return s;
+}
+
+fn main() {
+    var total: int32 = 0;
+    var i: int32 = 0;
+    while (i < 200000) {
+        var s: string = wrapper(i);
+        if (s == "nonsense") {
+            total = total + 1;
+        }
+        i = i + 1;
+    }
+    io::out("done, total = ", total);
+}

@@ -1,0 +1,43 @@
+// stdlib/random.prt -- pure-Proton pseudo-random number generator.
+//
+// Loaded via `use random;`. Every top-level name here lives under the
+// `random::` namespace: random::seed(42), random::nextInt(1,100),
+// random::nextFloat(), random::nextBool(0.5).
+//
+// Proton has no bitwise operators (no ^, <<, >>),
+// so this is a linear congruential generator (LCG) instead of something
+// like xorshift -- it only needs *, +, %, all of which Proton has.
+// Numerical Recipes parameters (a=1664525, c=1013904223, m=2^32); chosen
+// so that `a * state` stays within a double's exact 53-bit integer range
+// and never silently loses precision.
+//
+// This is NOT cryptographically secure. It's fine for games, simulations,
+// procedural content, etc.
+
+var _rngState: uint32 = 88172645;
+
+fn seed(value: uint32): void {
+    _rngState = value;
+}
+
+// Next raw 32-bit value from the generator.
+fn next(): uint32 {
+    _rngState = (1664525 * _rngState + 1013904223) % 4294967296;
+    return _rngState;
+}
+
+// Float in [0, 1).
+fn nextFloat(): float64 {
+    return next() / 4294967296.0;
+}
+
+// Integer in [min, max], inclusive on both ends.
+fn nextInt(min: int32, max: int32): int32 {
+    var range: int32 = max - min + 1;
+    return min + (next() % range);
+}
+
+// true with probability p (0.0 .. 1.0).
+fn nextBool(p: float64): bool {
+    return nextFloat() < p;
+}

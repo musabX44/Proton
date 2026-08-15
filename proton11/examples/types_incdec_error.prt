@@ -1,0 +1,7 @@
+fn main() {
+    var x: int8 = 127;
+    io::out("x = ", x);
+    io::out("incrementing past int8 max should fail:");
+    x++;
+    io::out("unreachable: ", x);
+}

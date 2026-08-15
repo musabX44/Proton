@@ -1,0 +1,23 @@
+// This is the leak pattern the README explicitly calls out as unsolved
+// by Faz 1: build() returns a fresh, unique string every call. Faz 1
+// promotes every one of these to permanent (interned) storage, so
+// permanent heap grows unboundedly across iterations. This test measures
+// exactly that growth.
+fn build(n: int32): string {
+    var a: string = "item-" + n;
+    var b: string = a + "-tag";
+    return b;
+}
+
+fn main() {
+    var total: int32 = 0;
+    var i: int32 = 0;
+    while (i < 200000) {
+        var s: string = build(i);
+        if (s == "nonsense") {
+            total = total + 1;
+        }
+        i = i + 1;
+    }
+    io::out("done, total = ", total);
+}

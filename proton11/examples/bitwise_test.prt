@@ -1,0 +1,11 @@
+fn main() {
+    var a: int = 12;
+    var b: int = 10;
+    io::out("a & b = ", a & b);
+    io::out("a | b = ", a | b);
+    io::out("a ^ b = ", a ^ b);
+    io::out("~a    = ", ~a);
+    io::out("a << 2 = ", a << 2);
+    io::out("a >> 2 = ", a >> 2);
+    io::out("1 | 2 & 3 = ", 1 | 2 & 3);
+}

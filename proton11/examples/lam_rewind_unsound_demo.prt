@@ -1,0 +1,34 @@
+// ---------------------------------------------------------------------
+// Regression test for a FIXED unsoundness in Proton 11's loop-scope
+// region rewind optimization (see README.md: "Proton 11: Döngü-Scope
+// Rewind — Statik Escape Analizi ile Düzeltildi").
+//
+// Output (correct, now guaranteed by static escape analysis):
+//   saved (should still be item-2) = item-2
+//
+// `saved` is assigned a region-allocated string produced during loop
+// iteration i==2. This assignment (a store into a local declared
+// before the loop, from inside the loop body) is detected at compile
+// time, which marks every OP_LOOP back-edge of this loop to skip its
+// region rewind -- so the memory `saved` points into is never reused
+// by later iterations, and this file's own name is now historical:
+// it demonstrates the fix, not the bug it's named after.
+// ---------------------------------------------------------------------
+fn build(n: int32): string {
+    return "item-" + n;
+}
+
+fn main() {
+    var saved: string = "";
+    var i: int32 = 0;
+    while (i < 50) {
+        var s: string = build(i);
+        if (i == 2) {
+            saved = s;  // 'saved' now points into iteration 2's region memory
+        }
+        // Iterations 3..49 each rewind-then-reallocate into that same
+        // memory, physically overwriting what 'saved' points to.
+        i = i + 1;
+    }
+    io::out("saved (should still be item-2) = ", saved);
+}

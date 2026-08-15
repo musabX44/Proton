@@ -1,0 +1,487 @@
+// stdlib/tensor.prt -- pure-Proton dense tensor library.
+//
+// Loaded via `use tensor;`.
+//
+// Representation:
+//   Tensor = dense row-major 2D float64 matrix.
+//   The current Proton type system has no T[][] syntax, so the backing
+//   storage is `list[]`, where every element is a float64[] row.
+//
+// This module deliberately stays pure Proton and builds on `push()`.
+// It is intended to be the foundation for ML, simulation, signal
+// processing, image operations, and numerical computing libraries.
+
+use math;
+
+struct Tensor {
+    data: list[];
+    rows: int32;
+    cols: int32;
+}
+
+// ---------------------------------------------------------------------
+// Construction
+// ---------------------------------------------------------------------
+
+fn zeros(rows: int32, cols: int32): Tensor {
+    if (rows < 0 || cols < 0) {
+        panic("tensor::zeros: shape must be non-negative");
+    }
+    var data: list[] = [];
+    for (var r: int32 = 0; r < rows; r++) {
+        var row: float64[] = [];
+        for (var c: int32 = 0; c < cols; c++) {
+            push(row, 0.0);
+        }
+        push(data, row);
+    }
+    return Tensor{data = data; rows = rows; cols = cols;};
+}
+
+fn ones(rows: int32, cols: int32): Tensor {
+    if (rows < 0 || cols < 0) {
+        panic("tensor::ones: shape must be non-negative");
+    }
+    var data: list[] = [];
+    for (var r: int32 = 0; r < rows; r++) {
+        var row: float64[] = [];
+        for (var c: int32 = 0; c < cols; c++) {
+            push(row, 1.0);
+        }
+        push(data, row);
+    }
+    return Tensor{data = data; rows = rows; cols = cols;};
+}
+
+fn full(rows: int32, cols: int32, value: float64): Tensor {
+    if (rows < 0 || cols < 0) {
+        panic("tensor::full: shape must be non-negative");
+    }
+    var data: list[] = [];
+    for (var r: int32 = 0; r < rows; r++) {
+        var row: float64[] = [];
+        for (var c: int32 = 0; c < cols; c++) {
+            push(row, value);
+        }
+        push(data, row);
+    }
+    return Tensor{data = data; rows = rows; cols = cols;};
+}
+
+fn fromRows(data: list[]): Tensor {
+    var rows: int32 = len(data);
+    var cols: int32 = 0;
+    if (rows > 0) {
+        var first: float64[] = data[0];
+        cols = len(first);
+    }
+    for (var r: int32 = 0; r < rows; r++) {
+        var row: float64[] = data[r];
+        if (len(row) != cols) {
+            panic("tensor::fromRows: ragged rows are not allowed");
+        }
+    }
+    return Tensor{data = data; rows = rows; cols = cols;};
+}
+
+fn fromVector(xs: float64[]): Tensor {
+    var data: list[] = [];
+    var row: float64[] = [];
+    for (var i: int32 = 0; i < len(xs); i++) {
+        push(row, xs[i]);
+    }
+    push(data, row);
+    return Tensor{data = data; rows = 1; cols = len(xs);};
+}
+
+fn copy(a: Tensor): Tensor {
+    var data: list[] = [];
+    for (var r: int32 = 0; r < a.rows; r++) {
+        var src: float64[] = a.data[r];
+        var row: float64[] = [];
+        for (var c: int32 = 0; c < a.cols; c++) {
+            push(row, src[c]);
+        }
+        push(data, row);
+    }
+    return Tensor{data = data; rows = a.rows; cols = a.cols;};
+}
+
+// ---------------------------------------------------------------------
+// Shape / access
+// ---------------------------------------------------------------------
+
+fn shapeRows(a: Tensor): int32 {
+    return a.rows;
+}
+
+fn shapeCols(a: Tensor): int32 {
+    return a.cols;
+}
+
+fn size(a: Tensor): int32 {
+    return a.rows * a.cols;
+}
+
+fn get(a: Tensor, row: int32, col: int32): float64 {
+    if (row < 0 || row >= a.rows || col < 0 || col >= a.cols) {
+        panic("tensor::get: index out of bounds");
+    }
+    var r: float64[] = a.data[row];
+    return r[col];
+}
+
+fn set(a: Tensor, row: int32, col: int32, value: float64): Tensor {
+    if (row < 0 || row >= a.rows || col < 0 || col >= a.cols) {
+        panic("tensor::set: index out of bounds");
+    }
+    var out: Tensor = copy(a);
+    var r: float64[] = out.data[row];
+    r[col] = value;
+    return out;
+}
+
+fn row(a: Tensor, index: int32): float64[] {
+    if (index < 0 || index >= a.rows) {
+        panic("tensor::row: index out of bounds");
+    }
+    var src: float64[] = a.data[index];
+    var out: float64[] = [];
+    for (var c: int32 = 0; c < a.cols; c++) {
+        push(out, src[c]);
+    }
+    return out;
+}
+
+// ---------------------------------------------------------------------
+// Elementwise arithmetic
+// ---------------------------------------------------------------------
+
+fn add(a: Tensor, b: Tensor): Tensor {
+    if (a.rows != b.rows || a.cols != b.cols) {
+        panic("tensor::add: shape mismatch");
+    }
+    var out: list[] = [];
+    for (var r: int32 = 0; r < a.rows; r++) {
+        var ar: float64[] = a.data[r];
+        var br: float64[] = b.data[r];
+        var rr: float64[] = [];
+        for (var c: int32 = 0; c < a.cols; c++) {
+            push(rr, ar[c] + br[c]);
+        }
+        push(out, rr);
+    }
+    return Tensor{data = out; rows = a.rows; cols = a.cols;};
+}
+
+fn sub(a: Tensor, b: Tensor): Tensor {
+    if (a.rows != b.rows || a.cols != b.cols) {
+        panic("tensor::sub: shape mismatch");
+    }
+    var out: list[] = [];
+    for (var r: int32 = 0; r < a.rows; r++) {
+        var ar: float64[] = a.data[r];
+        var br: float64[] = b.data[r];
+        var rr: float64[] = [];
+        for (var c: int32 = 0; c < a.cols; c++) {
+            push(rr, ar[c] - br[c]);
+        }
+        push(out, rr);
+    }
+    return Tensor{data = out; rows = a.rows; cols = a.cols;};
+}
+
+fn mul(a: Tensor, b: Tensor): Tensor {
+    if (a.rows != b.rows || a.cols != b.cols) {
+        panic("tensor::mul: shape mismatch");
+    }
+    var out: list[] = [];
+    for (var r: int32 = 0; r < a.rows; r++) {
+        var ar: float64[] = a.data[r];
+        var br: float64[] = b.data[r];
+        var rr: float64[] = [];
+        for (var c: int32 = 0; c < a.cols; c++) {
+            push(rr, ar[c] * br[c]);
+        }
+        push(out, rr);
+    }
+    return Tensor{data = out; rows = a.rows; cols = a.cols;};
+}
+
+fn div(a: Tensor, b: Tensor): Tensor {
+    if (a.rows != b.rows || a.cols != b.cols) {
+        panic("tensor::div: shape mismatch");
+    }
+    var out: list[] = [];
+    for (var r: int32 = 0; r < a.rows; r++) {
+        var ar: float64[] = a.data[r];
+        var br: float64[] = b.data[r];
+        var rr: float64[] = [];
+        for (var c: int32 = 0; c < a.cols; c++) {
+            if (br[c] == 0.0) {
+                panic("tensor::div: division by zero");
+            }
+            push(rr, ar[c] / br[c]);
+        }
+        push(out, rr);
+    }
+    return Tensor{data = out; rows = a.rows; cols = a.cols;};
+}
+
+fn scale(a: Tensor, value: float64): Tensor {
+    var out: list[] = [];
+    for (var r: int32 = 0; r < a.rows; r++) {
+        var ar: float64[] = a.data[r];
+        var rr: float64[] = [];
+        for (var c: int32 = 0; c < a.cols; c++) {
+            push(rr, ar[c] * value);
+        }
+        push(out, rr);
+    }
+    return Tensor{data = out; rows = a.rows; cols = a.cols;};
+}
+
+// ---------------------------------------------------------------------
+// Linear algebra
+// ---------------------------------------------------------------------
+
+fn transpose(a: Tensor): Tensor {
+    var out: list[] = [];
+    for (var c: int32 = 0; c < a.cols; c++) {
+        var rr: float64[] = [];
+        for (var r: int32 = 0; r < a.rows; r++) {
+            var ar: float64[] = a.data[r];
+            push(rr, ar[c]);
+        }
+        push(out, rr);
+    }
+    return Tensor{data = out; rows = a.cols; cols = a.rows;};
+}
+
+fn matmul(a: Tensor, b: Tensor): Tensor {
+    if (a.cols != b.rows) {
+        panic("tensor::matmul: inner dimensions must match");
+    }
+    var out: list[] = [];
+    for (var r: int32 = 0; r < a.rows; r++) {
+        var ar: float64[] = a.data[r];
+        var rr: float64[] = [];
+        for (var c: int32 = 0; c < b.cols; c++) {
+            var acc: float64 = 0.0;
+            for (var k: int32 = 0; k < a.cols; k++) {
+                var br: float64[] = b.data[k];
+                acc = acc + ar[k] * br[c];
+            }
+            push(rr, acc);
+        }
+        push(out, rr);
+    }
+    return Tensor{data = out; rows = a.rows; cols = b.cols;};
+}
+
+fn dot(a: Tensor, b: Tensor): float64 {
+    if (a.rows != 1 || b.rows != 1 || a.cols != b.cols) {
+        panic("tensor::dot: tensors must be row vectors of equal length");
+    }
+    var ar: float64[] = a.data[0];
+    var br: float64[] = b.data[0];
+    var acc: float64 = 0.0;
+    for (var i: int32 = 0; i < a.cols; i++) {
+        acc = acc + ar[i] * br[i];
+    }
+    return acc;
+}
+
+fn sum(a: Tensor): float64 {
+    var acc: float64 = 0.0;
+    for (var r: int32 = 0; r < a.rows; r++) {
+        var ar: float64[] = a.data[r];
+        for (var c: int32 = 0; c < a.cols; c++) {
+            acc = acc + ar[c];
+        }
+    }
+    return acc;
+}
+
+fn mean(a: Tensor): float64 {
+    if (size(a) == 0) {
+        panic("tensor::mean: empty tensor");
+    }
+    return sum(a) / size(a);
+}
+
+fn norm(a: Tensor): float64 {
+    var acc: float64 = 0.0;
+    for (var r: int32 = 0; r < a.rows; r++) {
+        var ar: float64[] = a.data[r];
+        for (var c: int32 = 0; c < a.cols; c++) {
+            acc = acc + ar[c] * ar[c];
+        }
+    }
+    return math::sqrt(acc);
+}
+
+// ---------------------------------------------------------------------
+// Reductions
+// ---------------------------------------------------------------------
+
+fn min(a: Tensor): float64 {
+    if (size(a) == 0) {
+        panic("tensor::min: empty tensor");
+    }
+    var best: float64 = a.data[0][0];
+    for (var r: int32 = 0; r < a.rows; r++) {
+        var ar: float64[] = a.data[r];
+        for (var c: int32 = 0; c < a.cols; c++) {
+            if (ar[c] < best) {
+                best = ar[c];
+            }
+        }
+    }
+    return best;
+}
+
+fn max(a: Tensor): float64 {
+    if (size(a) == 0) {
+        panic("tensor::max: empty tensor");
+    }
+    var best: float64 = a.data[0][0];
+    for (var r: int32 = 0; r < a.rows; r++) {
+        var ar: float64[] = a.data[r];
+        for (var c: int32 = 0; c < a.cols; c++) {
+            if (ar[c] > best) {
+                best = ar[c];
+            }
+        }
+    }
+    return best;
+}
+
+// ---------------------------------------------------------------------
+// Elementwise transforms
+// ---------------------------------------------------------------------
+
+fn relu(a: Tensor): Tensor {
+    var out: list[] = [];
+    for (var r: int32 = 0; r < a.rows; r++) {
+        var ar: float64[] = a.data[r];
+        var rr: float64[] = [];
+        for (var c: int32 = 0; c < a.cols; c++) {
+            var x: float64 = ar[c];
+            if (x < 0.0) {
+                x = 0.0;
+            }
+            push(rr, x);
+        }
+        push(out, rr);
+    }
+    return Tensor{data = out; rows = a.rows; cols = a.cols;};
+}
+
+private fn _exp(x: float64): float64 {
+    var term: float64 = 1.0;
+    var total: float64 = 1.0;
+    for (var i: int32 = 1; i <= 25; i++) {
+        term = term * x / i;
+        total = total + term;
+    }
+    return total;
+}
+
+fn sigmoid(a: Tensor): Tensor {
+    var out: list[] = [];
+    for (var r: int32 = 0; r < a.rows; r++) {
+        var ar: float64[] = a.data[r];
+        var rr: float64[] = [];
+        for (var c: int32 = 0; c < a.cols; c++) {
+            push(rr, 1.0 / (1.0 + _exp(-ar[c])));
+        }
+        push(out, rr);
+    }
+    return Tensor{data = out; rows = a.rows; cols = a.cols;};
+}
+
+fn tanh(a: Tensor): Tensor {
+    var out: list[] = [];
+    for (var r: int32 = 0; r < a.rows; r++) {
+        var ar: float64[] = a.data[r];
+        var rr: float64[] = [];
+        for (var c: int32 = 0; c < a.cols; c++) {
+            var e2x: float64 = _exp(2.0 * ar[c]);
+            push(rr, (e2x - 1.0) / (e2x + 1.0));
+        }
+        push(out, rr);
+    }
+    return Tensor{data = out; rows = a.rows; cols = a.cols;};
+}
+
+// ---------------------------------------------------------------------
+// Shape transforms
+// ---------------------------------------------------------------------
+
+fn reshape(a: Tensor, rows: int32, cols: int32): Tensor {
+    if (rows < 0 || cols < 0 || rows * cols != size(a)) {
+        panic("tensor::reshape: element count must stay constant");
+    }
+    var out: list[] = [];
+    var flatIndex: int32 = 0;
+    for (var r: int32 = 0; r < rows; r++) {
+        var rr: float64[] = [];
+        for (var c: int32 = 0; c < cols; c++) {
+            var sourceRow: int32 = flatIndex / a.cols;
+            var sourceCol: int32 = flatIndex - sourceRow * a.cols;
+            var src: float64[] = a.data[sourceRow];
+            push(rr, src[sourceCol]);
+            flatIndex = flatIndex + 1;
+        }
+        push(out, rr);
+    }
+    return Tensor{data = out; rows = rows; cols = cols;};
+}
+
+fn flatten(a: Tensor): float64[] {
+    var out: float64[] = [];
+    for (var r: int32 = 0; r < a.rows; r++) {
+        var ar: float64[] = a.data[r];
+        for (var c: int32 = 0; c < a.cols; c++) {
+            push(out, ar[c]);
+        }
+    }
+    return out;
+}
+
+// Concatenate tensors horizontally. Row counts must match.
+fn hstack(a: Tensor, b: Tensor): Tensor {
+    if (a.rows != b.rows) {
+        panic("tensor::hstack: row count mismatch");
+    }
+    var out: list[] = [];
+    for (var r: int32 = 0; r < a.rows; r++) {
+        var rr: float64[] = [];
+        var ar: float64[] = a.data[r];
+        var br: float64[] = b.data[r];
+        for (var ca: int32 = 0; ca < a.cols; ca++) {
+            push(rr, ar[ca]);
+        }
+        for (var cb: int32 = 0; cb < b.cols; cb++) {
+            push(rr, br[cb]);
+        }
+        push(out, rr);
+    }
+    return Tensor{data = out; rows = a.rows; cols = a.cols + b.cols;};
+}
+
+// Concatenate tensors vertically. Column counts must match.
+fn vstack(a: Tensor, b: Tensor): Tensor {
+    if (a.cols != b.cols) {
+        panic("tensor::vstack: column count mismatch");
+    }
+    var out: list[] = [];
+    for (var r: int32 = 0; r < a.rows; r++) {
+        push(out, row(a, r));
+    }
+    for (var r2: int32 = 0; r2 < b.rows; r2++) {
+        push(out, row(b, r2));
+    }
+    return Tensor{data = out; rows = a.rows + b.rows; cols = a.cols;};
+}

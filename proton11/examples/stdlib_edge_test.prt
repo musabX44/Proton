@@ -1,0 +1,12 @@
+use math;
+
+fn main() {
+    io::out("sin(10*PI) ~ 0 ->", math::sin(10.0 * math::PI));
+    io::out("sin(-PI/2) ~ -1 ->", math::sin(-math::PI / 2.0));
+    io::out("cos(PI) ~ -1 ->", math::cos(math::PI));
+    io::out("tan(PI/4) ~ 1 ->", math::tan(math::PI / 4.0));
+    io::out("floor(-3.2) ~ -4 ->", math::floor(-3.2));
+    io::out("ceil(-3.8) ~ -3 ->", math::ceil(-3.8));
+    io::out("now calling sqrt(-1), should panic:");
+    math::sqrt(-1.0);
+}

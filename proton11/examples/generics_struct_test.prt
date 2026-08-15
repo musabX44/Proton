@@ -1,0 +1,19 @@
+struct Box<T> {
+    value: T;
+}
+
+struct Pair<K, V> {
+    key: K;
+    val: V;
+}
+
+fn main() {
+    var b: Box = Box<int>{ value = 42; };
+    io::out("box value = ", b.value);
+
+    var s: Box = Box<string>{ value = "hello"; };
+    io::out("box string = ", s.value);
+
+    var p: Pair = Pair<string, int>{ key = "age"; val = 30; };
+    io::out("pair key=", p.key, " val=", p.val);
+}
