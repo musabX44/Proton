@@ -72,7 +72,7 @@ Create objects
       │
       ▼
 ┌───────────────┐
-│    LAM-2      │
+│    LAM        │
 │   allocation  │
 │    region     │
 └───────┬───────┘
@@ -92,7 +92,7 @@ LAM is an active area of development.
 
 # Benchmark
 
-One of the current Proton 11 LAM stress tests performs:
+One of the current Proton LAM stress tests performs:
 
 ```text
 20,000,000 string iterations
