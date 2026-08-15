@@ -57,7 +57,7 @@ A simple Proton program should feel familiar to developers coming from C-like la
 
 ---
 
-# LAM-2
+# LAM
 
 **LAM — Lifecycle Allocation Manager**
 
