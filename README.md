@@ -363,7 +363,7 @@ Low-level enough to build with.**
 
 ```text
 PROTON
-LAM-2
+LAM
 20,000,000 string iterations
 ~1.9 MB Peak RSS
 ```
