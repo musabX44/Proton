@@ -1,6 +1,0 @@
-fn main() {
-    var i: int32 = 13;
-    var age: string = "Hello";
-    var k: float32 = 3.14;
-    io::out(i, age, k);   
-}
